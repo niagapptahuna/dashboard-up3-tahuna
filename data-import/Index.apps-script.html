@@ -210,7 +210,6 @@
     .dt-multi .btn .on, .dt-multi .btn-check:checked + .btn .off { display: none; }
     .dt-multi .btn-check:checked + .btn .on { display: inline-block; }
     .dt-btn { min-height: 44px; }
-    .dt-source { margin-left: auto; font-size: .75rem; font-weight: 600; color: #64748b; text-align: right; }
     .dt-title { font-size: 1rem; font-weight: 800; color: #0f172a; margin: 0; }
     .dt-sub { font-size: .76rem; font-weight: 600; color: #475569; margin-top: 2px; }
     .dt-total { font-weight: 800; font-size: .8rem; color: #125D72; background: #e6f2f5; border-radius: 999px; padding: .35rem .85rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -288,7 +287,6 @@
       /* Tiga status di layar sempit: jumlah pindah ke baris kedua supaya tetap di dalam kartu. */
       .dt-multi .btn { flex-wrap: wrap; white-space: normal; row-gap: 0; line-height: 1.2; padding-top: .3rem; padding-bottom: .3rem; }
       .dt-multi .btn span { flex-basis: 100%; }
-      .dt-source { margin-left: 0; text-align: left; flex-basis: 100%; }
       .dt-table thead th.dt-unit { width: 108px; min-width: 108px; }
       .dt-ulp th { padding-left: 14px !important; }
       .dt-toggle { white-space: normal; gap: 6px; padding: 4px 4px; line-height: 1.2; }
@@ -564,7 +562,6 @@
               <label for="dt-tmp">Kriteria TMP</label>
               <select id="dt-tmp" class="form-select form-select-sm filter-control"></select>
             </div>
-            <div id="dt-source" class="dt-source"></div>
           </div>
         </div>
       </div>
@@ -1575,7 +1572,6 @@ function dtControls(enabled) {
     $('dt-n-' + s.id).textContent = enabled ? `(${dtFmt(DT.rows.filter((r) => r.status === s.key).length)})` : '';
     $('dt-st-' + s.id).checked = !!DT.st[s.key];
   });
-  $('dt-source').textContent = enabled ? `GV_67, tab ${DT.res.sheet || 'DAFTAR_TUNGGU'} · posisi ${dtPosisi()}` : '';
   if (!enabled) return;
 
   const opts = {};
