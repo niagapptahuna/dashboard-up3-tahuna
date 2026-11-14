@@ -1797,8 +1797,8 @@ function dtRenderCal() {
   const pos = String(DT.res.posisi || '').slice(0, 10);
   const lewat = (d) => !pos || dtIso(d) <= pos;
   const val = {};
-  // Penambahan daya = DAYA − DAYA_LAMA dari Pasang Baru dan Perubahan Daya; Migrasi tidak dihitung.
-  DT.rows.filter((r) => r.status === DT_SELESAI && r.tgl.slice(0, 7) === bulan && (!DT.ulp || r.ulp === DT.ulp) && (pb ? r.jenis === 'PB' : r.jenis !== 'PDM'))
+  // Penambahan daya = DAYA − DAYA_LAMA dari semua baris: Pasang Baru, Perubahan Daya dan Migrasi.
+  DT.rows.filter((r) => r.status === DT_SELESAI && r.tgl.slice(0, 7) === bulan && (!DT.ulp || r.ulp === DT.ulp) && (!pb || r.jenis === 'PB'))
     .forEach((r) => { val[r.tgl] = (val[r.tgl] || 0) + (pb ? 1 : r.tambah); });
   const vals = Object.values(val);
   const maxAbs = Math.max(1, ...vals.map(Math.abs));
@@ -1808,7 +1808,7 @@ function dtRenderCal() {
   const topDay = Object.keys(val).sort((a, b) => val[b] - val[a] || a.localeCompare(b))[0];
   const unitName = DT.ulp ? dtNama(DT.ulp) : 'UP3 Tahuna';
   const sampai = pos && pos.slice(0, 7) === bulan && dtDate(pos) < end ? ` s.d. ${dtTgl(dtDate(pos))}` : '';
-  $('dt-cal-sub').textContent = `${pb ? 'Pasang Baru' : 'Penambahan daya dari Pasang Baru dan Perubahan Daya'} berstatus PEREMAJAAN, per tanggal peremajaan, ${unitName}, `
+  $('dt-cal-sub').textContent = `${pb ? 'Pasang Baru' : 'Penambahan daya dari Pasang Baru, Perubahan Daya dan Migrasi'} berstatus PEREMAJAAN, per tanggal peremajaan, ${unitName}, `
     + `${bulanText}${sampai}: ${show(total)} ${unit}`
     + (topDay && val[topDay] > 0 ? `. Tertinggi ${show(val[topDay])} ${unit} pada ${DT_HARI_PANJANG[dtDow(dtDate(topDay))]}, ${dtTgl(dtDate(topDay), true)}.` : '.');
 
