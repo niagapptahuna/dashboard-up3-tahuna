@@ -595,6 +595,7 @@
               </div>
             </div>
           </div>
+          <ul class="dt-facts" id="dt-cal-facts"></ul>
           <div id="dt-cal"></div>
         </div>
       </div>
@@ -1789,6 +1790,7 @@ function dtRenderCal() {
   $('dt-cal-title').textContent = bulanText ? `Penyambungan harian, ${bulanText}` : 'Penyambungan harian';
   if (!bulan) {
     $('dt-cal-sub').textContent = '';
+    $('dt-cal-facts').innerHTML = '';
     $('dt-cal').innerHTML = '<div class="empty-state">Posisi data GV_67 belum terbaca, jadi bulan berjalan belum bisa ditentukan.</div>';
     return;
   }
@@ -1796,21 +1798,24 @@ function dtRenderCal() {
   const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
   const pos = String(DT.res.posisi || '').slice(0, 10);
   const lewat = (d) => !pos || dtIso(d) <= pos;
-  const val = {};
-  // Penambahan daya = DAYA − DAYA_LAMA dari semua baris: Pasang Baru, Perubahan Daya dan Migrasi.
-  DT.rows.filter((r) => r.status === DT_SELESAI && r.tgl.slice(0, 7) === bulan && (!DT.ulp || r.ulp === DT.ulp) && (!pb || r.jenis === 'PB'))
-    .forEach((r) => { val[r.tgl] = (val[r.tgl] || 0) + (pb ? 1 : r.tambah); });
-  const vals = Object.values(val);
-  const maxAbs = Math.max(1, ...vals.map(Math.abs));
   const show = (v) => (pb ? dtFmt(v) : (v > 0 ? '+' : '') + dtKva(v));
   const unit = pb ? 'pelanggan' : 'kVA';
-  const total = vals.reduce((s, v) => s + v, 0);
+  const done = DT.rows.filter((r) => r.status === DT_SELESAI && r.tgl.slice(0, 7) === bulan && (!DT.ulp || r.ulp === DT.ulp));
+  // Penambahan daya = DAYA − DAYA_LAMA dari semua baris: Pasang Baru, Perubahan Daya dan Migrasi.
+  const totPb = done.filter((r) => r.jenis === 'PB').length;
+  const totDaya = done.reduce((s, r) => s + r.tambah, 0);
+  $('dt-cal-facts').innerHTML = `<li><b>${dtFmt(totPb)} pelanggan</b>Total Pasang Baru</li>`
+    + `<li><b>${totDaya > 0 ? '+' : ''}${dtKva(totDaya)} kVA</b>Total penambahan daya</li>`;
+  const val = {};
+  done.filter((r) => !pb || r.jenis === 'PB').forEach((r) => { val[r.tgl] = (val[r.tgl] || 0) + (pb ? 1 : r.tambah); });
+  const vals = Object.values(val);
+  const maxAbs = Math.max(1, ...vals.map(Math.abs));
   const topDay = Object.keys(val).sort((a, b) => val[b] - val[a] || a.localeCompare(b))[0];
   const unitName = DT.ulp ? dtNama(DT.ulp) : 'UP3 Tahuna';
   const sampai = pos && pos.slice(0, 7) === bulan && dtDate(pos) < end ? ` s.d. ${dtTgl(dtDate(pos))}` : '';
   $('dt-cal-sub').textContent = `${pb ? 'Pasang Baru' : 'Penambahan daya dari Pasang Baru, Perubahan Daya dan Migrasi'} berstatus PEREMAJAAN, per tanggal peremajaan, ${unitName}, `
-    + `${bulanText}${sampai}: ${show(total)} ${unit}`
-    + (topDay && val[topDay] > 0 ? `. Tertinggi ${show(val[topDay])} ${unit} pada ${DT_HARI_PANJANG[dtDow(dtDate(topDay))]}, ${dtTgl(dtDate(topDay), true)}.` : '.');
+    + `${bulanText}${sampai}.`
+    + (topDay && val[topDay] > 0 ? ` Tertinggi ${show(val[topDay])} ${unit} pada ${DT_HARI_PANJANG[dtDow(dtDate(topDay))]}, ${dtTgl(dtDate(topDay), true)}.` : '');
 
   const first = new Date(start); first.setUTCDate(first.getUTCDate() - dtDow(first));
   let body = '';
