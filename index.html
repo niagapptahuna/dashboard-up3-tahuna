@@ -110,6 +110,7 @@
     .btn-shot:focus-visible { outline: 3px solid #0369a1; outline-offset: 2px; }
     .btn-shot[aria-busy="true"] { cursor: progress; opacity: .7; }
     .shot-stage { position: absolute; left: -100000px; top: 0; padding: 16px; }
+    .shot-stage abbr[title] { text-decoration: none; }
     .data-table { font-size: .8rem; margin: 0; }
     .data-table thead th {
       position: sticky; top: 0; z-index: 2; background: #f8f9fa !important; color: #64748b;
@@ -758,7 +759,8 @@ async function shotBlob(card) {
     clone.querySelectorAll('*').forEach((el) => {
       const cs = getComputedStyle(el);
       if (cs.position === 'sticky') el.style.position = 'static';
-      if (/auto|scroll/.test(cs.overflowX + cs.overflowY)) scrollers.push(el);
+      // Tabel di dalam <details> yang tertutup tetap punya lebar, padahal tidak tampil; jangan ikut melebarkan gambar.
+      if (/auto|scroll/.test(cs.overflowX + cs.overflowY) && !el.closest('details:not([open])')) scrollers.push(el);
     });
     scrollers.forEach((el) => { el.style.overflow = 'visible'; el.style.maxHeight = 'none'; });
     const extra = Math.max(0, ...scrollers.map((el) => el.scrollWidth - el.clientWidth));
