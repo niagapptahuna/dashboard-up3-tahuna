@@ -6,10 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= cfg.APP_TITLE ?></title>
 
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <!-- crossorigin: supaya tombol "Unduh gambar" bisa membaca gaya dan font saat membuat gambar -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet" crossorigin="anonymous">
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
@@ -101,6 +102,12 @@
     /* ── Table ── */
     .data-card { background: #fff; border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
     .table-wrap { max-height: 520px; overflow: auto; }
+    /* ── Unduh gambar: tombol di kepala kartu tabel; .no-capture tidak ikut ke gambar ── */
+    .btn-shot { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: .35rem .8rem; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #125D72; font-size: .75rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
+    .btn-shot:hover:not(:disabled) { background: #e6f2f5; border-color: #9fc3cd; }
+    .btn-shot:focus-visible { outline: 3px solid #0369a1; outline-offset: 2px; }
+    .btn-shot[aria-busy="true"] { cursor: progress; opacity: .7; }
+    .shot-stage { position: absolute; left: -100000px; top: 0; padding: 16px; }
     .data-table { font-size: .8rem; margin: 0; }
     .data-table thead th {
       position: sticky; top: 0; z-index: 2; background: #f8f9fa !important; color: #64748b;
@@ -510,9 +517,12 @@
               <small class="text-muted fw-600" style="font-size:.75rem"><span id="count-prioritas">0 baris</span> · Monitoring <?= cfg.UNIT_NAME ?></small>
             </div>
           </div>
-          <div class="input-group input-group-sm search-group" style="max-width:300px">
-            <span class="input-group-text rounded-start-3 px-3"><i class="fas fa-search text-muted"></i></span>
-            <input id="search-prioritas" type="text" class="form-control rounded-end-3 py-2 fw-600" placeholder="Cari IDPEL / Nama...">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <div class="input-group input-group-sm search-group no-capture" style="max-width:300px">
+              <span class="input-group-text rounded-start-3 px-3"><i class="fas fa-search text-muted"></i></span>
+              <input id="search-prioritas" type="text" class="form-control rounded-end-3 py-2 fw-600" placeholder="Cari IDPEL / Nama...">
+            </div>
+            <button type="button" class="btn-shot no-capture" data-name="Data Detail Pelanggan Prioritas"><i class="fas fa-download" aria-hidden="true"></i><span>Unduh gambar</span></button>
           </div>
         </div>
         <div class="table-wrap">
@@ -574,7 +584,7 @@
               <h6 class="dt-title" id="dt-cal-title">Penyambungan harian</h6>
               <div class="dt-sub" id="dt-cal-sub"></div>
             </div>
-            <div class="dt-filter">
+            <div class="dt-filter no-capture">
               <div class="dt-field">
                 <span class="dt-lbl" id="dt-metric-lbl">Tampilkan</span>
                 <div class="btn-group seg-toggle" role="radiogroup" aria-labelledby="dt-metric-lbl">
@@ -588,6 +598,7 @@
                 <label for="dt-cal-ulp">Unit</label>
                 <select id="dt-cal-ulp" class="form-select form-select-sm filter-control"></select>
               </div>
+              <button type="button" class="btn-shot no-capture" id="dt-cal-shot" data-name="Penyambungan harian"><i class="fas fa-download" aria-hidden="true"></i><span>Unduh gambar</span></button>
             </div>
           </div>
           <ul class="dt-facts" id="dt-cal-facts"></ul>
@@ -643,6 +654,102 @@ function toast(icon, text, timer = 3000) {
   if (!window.Swal) { console.log(`[${icon}] ${text}`); return; }
   Swal.fire({ toast: true, position: 'top-end', showConfirmButton: false, timer, timerProgressBar: true, icon, titleText: text });
 }
+
+/* ═══════════════════ UNDUH GAMBAR TABEL ═══════════════════ */
+// Kartu tabel jadi PNG lewat html-to-image (dimuat saat tombol pertama kali diklik). Gambar dibuat dari
+// salinan kartu di luar layar, di induk yang sama supaya semua aturan CSS tetap berlaku; area tabel
+// yang bisa digeser dibuka penuh, dan elemen .no-capture (tombol, filter, petunjuk geser) tidak ikut.
+const SHOT_LIB_URL = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js';
+let shotLibLoading = null;
+const shotBtn = (name) => `<button type="button" class="btn-shot no-capture" data-name="${esc(name)}"><i class="fas fa-download" aria-hidden="true"></i><span>Unduh gambar</span></button>`;
+
+function shotLib() {
+  if (window.htmlToImage) return Promise.resolve(window.htmlToImage);
+  if (!shotLibLoading) {
+    shotLibLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = SHOT_LIB_URL;
+      s.onload = () => (window.htmlToImage ? resolve(window.htmlToImage) : reject(new Error('html-to-image tidak tersedia')));
+      s.onerror = () => reject(new Error('html-to-image gagal dimuat'));
+      document.head.appendChild(s);
+    }).catch((e) => { shotLibLoading = null; throw e; });
+  }
+  return shotLibLoading;
+}
+
+/** PNG (Blob) dari satu kartu, selebar isi tabelnya. */
+async function shotBlob(card) {
+  const lib = await shotLib();
+  const stage = document.createElement('div');
+  stage.className = 'shot-stage';
+  stage.style.background = getComputedStyle(document.body).backgroundColor;
+  stage.style.width = card.offsetWidth + 32 + 'px';
+  const clone = card.cloneNode(true);
+  stage.appendChild(clone);
+  card.after(stage);
+  try {
+    // Grafik (canvas) tidak ikut tersalin oleh cloneNode, jadi gambarnya disalin manual.
+    const src = card.querySelectorAll('canvas'), dst = clone.querySelectorAll('canvas');
+    src.forEach((c, i) => { if (dst[i] && c.width && c.height) dst[i].getContext('2d').drawImage(c, 0, 0); });
+    // Dibuang sebelum diukur, supaya tata letak gambar tidak menyisakan ruang kosong bekas tombol/filter.
+    clone.querySelectorAll('.no-capture').forEach((n) => n.remove());
+    const scrollers = [];
+    clone.querySelectorAll('*').forEach((el) => {
+      const cs = getComputedStyle(el);
+      if (cs.position === 'sticky') el.style.position = 'static';
+      if (/auto|scroll/.test(cs.overflowX + cs.overflowY)) scrollers.push(el);
+    });
+    scrollers.forEach((el) => { el.style.overflow = 'visible'; el.style.maxHeight = 'none'; });
+    const extra = Math.max(0, ...scrollers.map((el) => el.scrollWidth - el.clientWidth));
+    stage.style.width = card.offsetWidth + 32 + extra + 'px';
+    await new Promise((r) => requestAnimationFrame(() => r()));
+    const w = stage.offsetWidth, h = stage.offsetHeight;
+    // Tajam (2x) bila muat; dibatasi supaya ponsel tidak kehabisan memori untuk tabel yang sangat besar.
+    const maxPx = matchMedia('(pointer: coarse)').matches ? 16e6 : 60e6;
+    const pixelRatio = Math.max(0.5, Math.min(2, Math.sqrt(maxPx / (w * h))));
+    return await lib.toBlob(stage, {
+      pixelRatio, width: w, height: h,
+      // Posisi luar layar hanya untuk halaman; di gambar salinannya harus mulai dari pojok kiri atas.
+      style: { position: 'static', left: '0', top: '0', margin: '0' },
+      filter: (n) => !(n.classList && n.classList.contains('no-capture')),
+    });
+  } finally {
+    stage.remove();
+  }
+}
+
+function shotSave(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${String(name).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.btn-shot');
+  // Saat sibuk tombol tidak di-disable (fokus keyboard tetap di tombol), klik ulang diabaikan.
+  if (!btn || btn.getAttribute('aria-busy') === 'true') return;
+  const card = btn.closest('.chart-card, .data-card');
+  if (!card) return;
+  const icon = btn.querySelector('i'), label = btn.querySelector('span');
+  const name = btn.dataset.name || 'Dashboard Kinerja';
+  btn.setAttribute('aria-busy', 'true');
+  icon.className = 'fas fa-spinner fa-spin';
+  label.textContent = 'Menyiapkan…';
+  try {
+    shotSave(await shotBlob(card), name);
+  } catch (err) {
+    console.warn('Unduh gambar gagal:', err);
+    toast('error', 'Gambar gagal dibuat. Periksa koneksi lalu coba lagi.');
+  } finally {
+    btn.removeAttribute('aria-busy');
+    icon.className = 'fas fa-download';
+    label.textContent = 'Unduh gambar';
+  }
+});
 
 /* ═══════════════════ LAYOUT ═══════════════════ */
 const PAGE_TITLES = { prioritas: 'Pelanggan Prioritas', nps: 'NPS', 'daftar-tunggu': 'Daftar Tunggu', updated: 'Updated Soon' };
@@ -1348,7 +1455,10 @@ function npsSectionHtml(v) {
         <small class="fw-600 text-primary">${esc(v.unit.label)} · posisi ${esc(bln)}</small>
         ${v.stale ? `<div class="nps-stale"><i class="fas fa-circle-info me-1"></i>Realisasi bagian ini di sheet baru terisi s.d. ${esc(bln)}, jadi yang ditampilkan posisi ${esc(NAMA_BULAN[v.eff])}, bukan ${esc(NAMA_BULAN[v.month])}.</div>` : ''}
       </div>
-      ${r.pct ? `<span class="nps-pill ${npsStatus(v.pct)}">${esc(npsPct(v.pct))}</span>` : ''}
+      <div class="d-flex align-items-center gap-2">
+        ${r.pct ? `<span class="nps-pill ${npsStatus(v.pct)}">${esc(npsPct(v.pct))}</span>` : ''}
+        ${shotBtn(`NPS - ${npsTitle(v.s.title)} - ${v.unit.label} - ${bln}`)}
+      </div>
     </div>
     <div class="row g-2 mb-3">${stats}</div>
     <div class="row g-3">
@@ -1689,10 +1799,13 @@ function dtRenderRekap() {
         <h6 class="dt-title">Rekap per ULP dan jenis transaksi</h6>
         <div class="dt-sub">${esc(sub)}</div>
       </div>
-      <span class="dt-total">${dtFmt(rows.length)} pelanggan</span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="dt-total">${dtFmt(rows.length)} pelanggan</span>
+        ${shotBtn(`Daftar Tunggu - Rekap ${tmpText} - posisi ${dtPosisi()}`)}
+      </div>
     </div>
     ${rows.length ? `<ul class="dt-facts">${facts.join('')}</ul>` : `<p class="dt-note my-3">Tidak ada permohonan untuk pilihan ini.</p>`}
-    <div class="dt-hint">Geser tabel ke samping untuk melihat kolom hari berikutnya dan total.</div>
+    <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat kolom hari berikutnya dan total.</div>
     <div class="dt-wrap" tabindex="0" role="region" aria-label="Tabel rekap daftar tunggu, bisa digeser">
       <table class="dt-table">
         <caption class="visually-hidden">Jumlah pelanggan per unit dan jenis transaksi menurut durasi hari kerja, ${esc(tmpText)}</caption>
@@ -1732,6 +1845,7 @@ function dtRenderCal() {
   const topDay = Object.keys(val).sort((a, b) => val[b] - val[a] || a.localeCompare(b))[0];
   const unitName = DT.ulp ? dtNama(DT.ulp) : 'UP3 Tahuna';
   const sampai = pos && pos.slice(0, 7) === bulan && dtDate(pos) < end ? ` s.d. ${dtTgl(dtDate(pos))}` : '';
+  $('dt-cal-shot').dataset.name = `Penyambungan harian ${bulanText} - ${pb ? 'Pasang Baru' : 'Penambahan daya'} - ${unitName}`;
   $('dt-cal-sub').textContent = `${pb ? 'Pasang Baru' : 'Penambahan daya dari Pasang Baru, Perubahan Daya dan Migrasi'} berstatus PEREMAJAAN, per tanggal peremajaan, ${unitName}, `
     + `${bulanText}${sampai}.`
     + (topDay && val[topDay] > 0 ? ` Tertinggi ${show(val[topDay])} ${unit} pada ${DT_HARI_PANJANG[dtDow(dtDate(topDay))]}, ${dtTgl(dtDate(topDay), true)}.` : '');
