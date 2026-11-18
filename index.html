@@ -163,6 +163,7 @@
     #sidebar .submenu a { padding: 9px 12px 9px 16px; margin: 2px 15px 2px 26px; font-size: .8rem; line-height: 1.3; }
     #sidebar .submenu a:hover { padding-left: 19px; }
     #sidebar .submenu a i { font-size: .8rem; }
+    @media (pointer: coarse) { #sidebar .submenu a { min-height: 44px; } }
     #sidebar .sub-note { padding: 6px 15px 6px 50px; font-size: .75rem; color: #94a3b8; }
     #sidebar .sub-retry { background: none; border: 0; padding: 0; color: var(--pln-gold); text-decoration: underline; font-size: .75rem; }
 
@@ -329,9 +330,11 @@
       <li><a href="#" data-page="prioritas"><i class="fas fa-crown"></i><span>Pelanggan Prioritas</span></a></li>
       <li class="open">
         <a href="#" data-group="nps"><i class="fas fa-chart-line"></i><span>NPS</span><i class="fas fa-chevron-down caret"></i></a>
-        <ul id="nps-submenu" class="submenu"><li class="sub-note">Memuat…</li></ul>
+        <ul id="nps-submenu" class="submenu">
+          <li class="sub-note">Memuat…</li>
+          <li class="dt-menu-item"><a href="#" data-page="daftar-tunggu"><i class="fas fa-user-clock" aria-hidden="true"></i><span>Daftar Tunggu</span></a></li>
+        </ul>
       </li>
-      <!-- dt-menu --><li><a href="#" data-page="daftar-tunggu"><i class="fas fa-user-clock" aria-hidden="true"></i><span>Daftar Tunggu</span></a></li><!-- /dt-menu -->
       <li><a href="#" data-page="updated"><i class="fas fa-clock-rotate-left"></i><span>Updated Soon</span></a></li>
     </ul>
 
@@ -815,7 +818,7 @@ document.addEventListener('click', async (e) => {
 });
 
 /* ═══════════════════ LAYOUT ═══════════════════ */
-const PAGE_TITLES = { prioritas: 'Pelanggan Prioritas', nps: 'NPS', 'daftar-tunggu': 'Daftar Tunggu', updated: 'Updated Soon' };
+const PAGE_TITLES = { prioritas: 'Pelanggan Prioritas', nps: 'NPS', 'daftar-tunggu': 'NPS · Daftar Tunggu', updated: 'Updated Soon' };
 const isMobile = () => window.innerWidth < 992;
 
 function toggleSidebar() {
@@ -833,7 +836,7 @@ function markActiveMenu() {
   document.querySelectorAll('#sidebar [data-page]').forEach((a) => a.classList.toggle('active-link',
     a.dataset.page === S.page && (S.page !== 'nps' || Number(a.dataset.sheet) === S.npsSheet)));
   const grp = document.querySelector('#sidebar [data-group="nps"]');
-  if (grp) grp.classList.toggle('group-active', S.page === 'nps');
+  if (grp) grp.classList.toggle('group-active', S.page === 'nps' || S.page === 'daftar-tunggu');
 }
 
 function showPage(id, sub) {
@@ -1424,15 +1427,20 @@ function npsSel(sh) {
 
 function buildNpsMenu() {
   const ul = $('nps-submenu');
+  // Daftar Tunggu punya data sendiri, jadi selalu tampil di akhir submenu; hanya item sheet NPS yang dibangun ulang.
+  const dt = ul.querySelector('.dt-menu-item');
+  [...ul.children].forEach((li) => { if (li !== dt) li.remove(); });
+  let html;
   if (!S.nps) {
-    ul.innerHTML = S.npsError
+    html = S.npsError
       ? '<li class="sub-note">Gagal memuat. <button type="button" class="sub-retry" data-action="nps-retry">Coba lagi</button></li>'
       : '<li class="sub-note">Memuat…</li>';
-    return;
+  } else {
+    html = S.nps.sheets.length
+      ? S.nps.sheets.map((sh, i) => `<li><a href="#" data-page="nps" data-sheet="${i}" title="${esc(sh.name)}"><i class="fas ${npsIcon(sh.name)}"></i><span>${esc(npsTitle(sh.name))}</span></a></li>`).join('')
+      : `<li class="sub-note">Belum ada sheet ${esc(S.nps.year)}.</li>`;
   }
-  ul.innerHTML = S.nps.sheets.length
-    ? S.nps.sheets.map((sh, i) => `<li><a href="#" data-page="nps" data-sheet="${i}" title="${esc(sh.name)}"><i class="fas ${npsIcon(sh.name)}"></i><span>${esc(npsTitle(sh.name))}</span></a></li>`).join('')
-    : `<li class="sub-note">Belum ada sheet ${esc(S.nps.year)}.</li>`;
+  dt.insertAdjacentHTML('beforebegin', html);
   markActiveMenu();
 }
 
