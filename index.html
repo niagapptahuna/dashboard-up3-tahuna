@@ -350,6 +350,11 @@
     .pt-table tfoot th, .pt-table tfoot td { background: #e6f2f5; color: #125D72; font-weight: 800; border-top: 2px solid #125D72; border-bottom: 0; }
     .pt-table tr.muted th, .pt-table tr.muted td { color: #64748b; font-weight: 500; }
     .pt-table .nps-pill { font-size: .7rem; }
+    /* Kogol 2 & 3: kolom angka sama lebar di kedua tabel, sisa lebar untuk nama satker (boleh dua baris) */
+    .pt-k23 { table-layout: fixed; min-width: 880px; }
+    .pt-k23 tbody th, .pt-k23 tfoot th { white-space: normal; }
+    .pt-c-n { width: 46px; }
+    .pt-c-rp { width: 120px; }   /* muat Rp 1.234.567.890 */
     .pt-code { font-size: .66rem; font-weight: 600; color: #64748b; margin-right: 2px; }
     .pt-tag { display: inline-block; margin-left: 2px; font-size: .62rem; font-weight: 700; color: #475569; background: #f1f5f9; border-radius: 6px; padding: 1px 6px; }
     .pt-mini { display: inline-flex; align-items: center; gap: 8px; }
@@ -2592,29 +2597,33 @@ function ptRenderHari() {
 /* ── Tampilan Kogol 2 & 3 (Excel: Mon. Kogol 2 & 3) ── */
 function ptRenderKogol23() {
   const m = PT.m;
-  const kartu = (s) => {
+  const kosong = (s) => !s.rows.length && !s.non;
+  const bagian = (s) => {
     const menunggak = s.rows.filter((r) => r.tot[0] > 0).length;
     const baris = (g, tot) => g.map((x) => `${ptTd(x[0], 's')}${ptTd(x[1])}`).join('') + `${ptTd(tot[0], 's b')}${ptTd(tot[1], 'b')}`;
     const isi = s.rows.map((r) => `<tr class="${r.tot[0] ? '' : 'muted'}"><th scope="row">${r.kode ? `<span class="pt-code">${esc(r.kode)}</span> ` : ''}${esc(r.nama)}`
       + `${!r.dipantau ? ' <span class="pt-tag">di luar daftar</span>' : r.tot[0] ? '' : ' <span class="pt-tag">tidak ada tunggakan</span>'}</th>${baris(r.g, r.tot)}</tr>`).join('')
       + (s.non ? `<tr><th scope="row">Non MIV</th>${baris(s.non.g, s.non.tot)}</tr>` : '');
-    const kosong = !s.rows.length && !s.non;
-    return `<div class="chart-card mb-4">
-      ${ptHead(`Kogol ${s.kogol}: tunggakan per satker`, `Menurut jumlah lembar, posisi ${esc(m.stamp)}`,
-        kosong ? '' : `Saldo Piutang - Kogol ${s.kogol} per satker - posisi ${m.stamp}`)}
-      ${kosong ? `<div class="pt-empty">Tidak ada tunggakan Kogol ${s.kogol} di DB_TAGLIS.</div>` : `<ul class="dt-facts">
+    return `<section class="pt-sec">
+      <h6 class="pt-sec-title">Kogol ${s.kogol}</h6>
+      ${kosong(s) ? `<div class="pt-empty">Tidak ada tunggakan Kogol ${s.kogol} di DB_TAGLIS.</div>` : `<ul class="dt-facts">
         <li><b>${ptNum(s.total[0])}</b>Plg menunggak</li><li><b>${ptRp(s.total[1])}</b>Rp PTL</li>
         <li><b>${menunggak} dari ${s.rows.length}</b>Satker MIV masih menunggak</li>
         ${s.non ? `<li><b>${ptNum(s.non.tot[0])}</b>Plg Non MIV</li>` : ''}</ul>
       <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat semua kolom.</div>
-      <div class="pt-wrap" tabindex="0" aria-label="Tabel Kogol ${s.kogol} per satker, dapat digeser"><table class="pt-table">
+      <div class="pt-wrap" tabindex="0" aria-label="Tabel Kogol ${s.kogol} per satker, dapat digeser"><table class="pt-table pt-k23">
+        <colgroup><col>${'<col class="pt-c-n"><col class="pt-c-rp">'.repeat(4)}</colgroup>
         <thead><tr><th rowspan="2" class="pt-unit" scope="col">Satker</th>${PT_LEMBAR.map((l) => `<th colspan="2" class="s" scope="colgroup">${esc(l)}</th>`).join('')}
           <th colspan="2" class="s" scope="colgroup">Total</th></tr>
           <tr>${ptPair('Plg', 'Rp PTL').repeat(4)}</tr></thead>
         <tbody>${isi}</tbody>
-        <tfoot><tr><th scope="row">Total Kogol ${s.kogol}</th>${baris(s.g, s.total)}</tr></tfoot></table></div>`}</div>`;
+        <tfoot><tr><th scope="row">Total Kogol ${s.kogol}</th>${baris(s.g, s.total)}</tr></tfoot></table></div>`}</section>`;
   };
-  $('pt-v-kogol23').innerHTML = m.satker.map(kartu).join('');
+  // Kogol 2 dan 3 dalam satu kartu dengan satu tombol unduh gambar.
+  $('pt-v-kogol23').innerHTML = `<div class="chart-card mb-4" id="pt-kogol23-card">
+    ${ptHead('Tunggakan Kogol 2 &amp; 3 per satker', `Menurut jumlah lembar, posisi ${esc(m.stamp)}`,
+      m.satker.every(kosong) ? '' : `Saldo Piutang - Kogol 2 dan 3 per satker - posisi ${m.stamp}`)}
+    ${m.satker.map(bagian).join('')}</div>`;
 }
 
 /* ── Tampilan Non-Kogol 1 & 2 (Excel: Mon. Non-Kogol 1) ── */
