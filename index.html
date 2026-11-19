@@ -326,6 +326,13 @@
     .pt-rank .val { text-align: right; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; line-height: 1.2; }
     .pt-rank .val small { display: block; font-size: .68rem; font-weight: 600; color: #475569; }
     .pt-rank li.up3 { background: #e6f2f5; }
+    /* UP3 di bawah, terpisah dari peringkat ULP (bukan bagian urutan). */
+    .pt-rank-total { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1; }
+    /* Kartu Harian berisi beberapa bagian; garis tipis memisahkan bagian, satu tombol unduh untuk semuanya. */
+    .pt-sec { margin-top: 20px; padding-top: 18px; border-top: 1px solid #e2e8f0; }
+    .pt-sec-title { font-size: .9rem; font-weight: 800; color: #0f172a; margin: 0 0 2px; }
+    .pt-chart-title { font-size: .8rem; font-weight: 700; color: #0f172a; margin: 0; }
+    .pt-sec .pt-head { margin-bottom: 6px; }
     .pt-rank li.up3 .nm, .pt-rank li.up3 .val { color: #125D72; }
     /* relative: label tersembunyi (position absolute) di sel tetap di dalam area geser, tidak melebarkan halaman. */
     .pt-wrap { position: relative; overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 12px; }
@@ -2087,7 +2094,7 @@ const PT_LANCAR = [
   { key: 'pel', name: 'Pelunasan' },
   { key: 'pct', name: '% saldo' },
 ];
-const PT = { res: null, m: null, error: '', loading: null, view: 'harian', lancar: 'saldo', rataUnit: '', charts: {} };
+const PT = { res: null, m: null, error: '', loading: null, view: 'harian', lancar: 'saldo', rataUnit: '', hariUnit: '', charts: {} };
 
 const ptFetch = () => (typeof fetchData === 'function' ? fetchData('piutang') : gas('getPiutangData'));
 const ptNum = (n) => (n == null || !isFinite(n) ? '–' : Math.round(n).toLocaleString('id-ID'));
@@ -2188,9 +2195,7 @@ function ptModel(res) {
     const rReal = bagi(u.lancar.saldoEx1, u.lancar.sorekEx1);
     u.rek = { target: tRek, real: rReal, capai: tRek && rReal != null ? 2 - rReal / tRek : null };
 
-    // Saldo akhir bulan berjalan (sisa saat ini) dan saldo rata-rata akhir bulan (bulan yang sudah lewat).
-    const tAkhir = bi >= 0 ? pilih(k, (x) => ambil('targetSaldoAkhir', x, (o) => o[bi])) : null;
-    u.akhir = { target: tAkhir, real: u.sisa.rp, capai: tAkhir ? Math.max(0, 2 - u.sisa.rp / tAkhir) : null };
+    // Saldo rata-rata akhir bulan: rata-rata saldo akhir bulan-bulan yang sudah lewat.
     const hist = [];
     for (let mm = 0; mm < Math.max(bi, 0); mm++) hist.push(pilih(k, (x) => akhirBulan(x, mm)));
     const ada = hist.filter((v) => v != null);
@@ -2248,13 +2253,20 @@ function ptModel(res) {
   if (lewat.unitLain) warn.push(`${ptNum(lewat.unitLain)} baris DB_TAGLIS dengan UNITUP di luar UP3 Tahuna tidak dihitung.`);
   if (lewat.kogolLain) warn.push(`${ptNum(lewat.kogolLain)} baris DB_TAGLIS dengan KOGOL kosong atau di luar 0 s.d. 4 tidak dihitung.`);
 
+  // Pelunasan harian (tab REKAP_PELUNASAN): hanya tanggal di bulan SOREK.
+  const P = res.pelunasan || { tanggal: [], unit: {}, catatan: 'Perbarui Apps Script (deploy versi baru) untuk menampilkan pelunasan harian.' };
+  const blnRekap = bulan || (P.tanggal.length ? P.tanggal[P.tanggal.length - 1].slice(0, 7) : '');
+  const iRekap = P.tanggal.map((t, i) => (t.slice(0, 7) === blnRekap ? i : -1)).filter((i) => i >= 0);
+  const rekap = { bulan: blnRekap, tanggal: iRekap.map((i) => P.tanggal[i]), unit: {}, catatan: P.catatan || '' };
+  Object.keys(P.unit || {}).forEach((k) => { rekap.unit[k] = iRekap.map((i) => P.unit[k][i]); });
+  if (!rekap.tanggal.length && !rekap.catatan) {
+    rekap.catatan = `Tab REKAP_PELUNASAN belum memuat pelunasan ${ptBulan(blnRekap)}. Tempel Rekap pelunasan bulan ini di tab itu.`;
+  }
+
   return {
-    units, ulp, up3: units[units.length - 1], satker, warn, bulan, bi,
+    units, ulp, up3: units[units.length - 1], satker, warn, bulan, bi, rekap,
     stamp: ptWaktu(waktu),
     lalu: lalu ? lalu[0] : '',
-    bulanData: hariIni ? hariIni.slice(0, 7) : bulan,
-    harian: log.entri.filter((e) => hariIni && e[0].slice(0, 7) === hariIni.slice(0, 7))
-      .map((e) => { const v = dariLog(e, up3); return { tgl: e[0], lbr: v ? v[0] : null, rp: v ? v[1] : null }; }),
   };
 }
 
@@ -2354,36 +2366,31 @@ function ptRenderHarian() {
   const up3 = m.up3;
   const bln = ptBulan(m.bulan) || 'bulan berjalan';
   const sejak = m.lalu ? `Pelunasan sejak ${dtTgl(dtDate(m.lalu))}` : '';
+  const hint = '<div class="dt-hint no-capture">Geser tabel ke samping untuk melihat semua kolom.</div>';
+  const pilihan = m.units.map((u) => `<option value="${esc(u.kode)}">${esc(u.nama)}</option>`).join('');
+  const pilihUnit = (id) => `<div class="pt-tools no-capture"><div class="dt-field"><label for="${id}">Unit</label>
+    <select id="${id}" class="form-select form-select-sm filter-control">${pilihan}</select></div></div>`;
 
-  // 1. Progres per ULP (urut tertinggi); UP3 disisipkan di posisinya sebagai pembanding.
+  // 1. Progres per ULP, urut tertinggi; UP3 di bawah, terpisah dari peringkat.
   const urut = m.ulp.slice().sort((a, b) => (b.prog.rp ?? -1) - (a.prog.rp ?? -1));
-  const rank = [];
-  let up3Masuk = up3.prog.rp == null;
-  urut.forEach((u) => {
-    if (!up3Masuk && (u.prog.rp ?? -1) < up3.prog.rp) { rank.push(ptRankRow(up3)); up3Masuk = true; }
-    rank.push(ptRankRow(u));
-  });
-  if (!up3Masuk) rank.push(ptRankRow(up3));
   const facts = `<ul class="dt-facts">
     <li><b>${ptPct(up3.prog.rp)}</b>Progres UP3 (Rp)</li>
     <li><b>${ptRp(up3.pel.rp)}</b>Terlunasi, ${ptNum(up3.pel.lbr)} lbr</li>
     <li><b>${ptRp(up3.sisa.rp)}</b>Sisa saldo, ${ptNum(up3.sisa.lbr)} lbr</li>
     ${up3.hari ? `<li><b>${ptRp(up3.hari.rp)}</b>${esc(sejak)}, ${ptNum(up3.hari.lbr)} lbr</li>` : ''}
   </ul>`;
-  const c1 = `<div class="chart-card mb-4" id="pt-ringkas">
-    ${ptHead(`Progres pelunasan SOREK ${esc(bln)}`, `Non Kogol 1 &amp; 2 (Kogol 0, 3, 4): Rp terlunasi dari SOREK per ULP, posisi ${esc(m.stamp)}`,
-      `Saldo Piutang - Progres pelunasan ${bln} - posisi ${m.stamp}`)}
-    ${facts}<ul class="pt-rank" aria-label="Progres pelunasan per ULP, dari tertinggi">${rank.join('')}</ul></div>`;
+  const s1 = `<section class="pt-sec">
+    <h6 class="pt-sec-title">Progres pelunasan per ULP</h6><div class="dt-sub">Rp terlunasi dari SOREK, urut tertinggi</div>
+    ${facts}<ul class="pt-rank" aria-label="Progres pelunasan per ULP, dari tertinggi">${urut.map(ptRankRow).join('')}</ul>
+    <ul class="pt-rank pt-rank-total" aria-label="Progres pelunasan UP3">${ptRankRow(up3)}</ul></section>`;
 
-  // 2. Tabel monitoring harian (Excel: Monitoring Saldo Piutang Non Kogol 1 & 2)
+  // 2. Monitoring per ULP (Excel: Monitoring Saldo Piutang Non Kogol 1 & 2)
   const kolomHari = !!m.lalu;
   const baris2 = (u) => `${ptTd(u.sorek.lbr, 's')}${ptTd(u.sorek.rp)}${ptTd(u.pel.lbr, 's')}${ptTd(u.pel.rp)}${ptTd(u.sisa.lbr, 's')}${ptTd(u.sisa.rp, 'b')}`
     + (kolomHari ? `${ptTd(u.hari && u.hari.lbr, 's')}${ptTd(u.hari && u.hari.rp)}` : '')
     + `${ptTdPct(u.prog.lbr, 's')}<td class="b">${ptPct(u.prog.rp)}</td><td class="s">${u.up3 || u.rank == null ? '' : u.rank}</td>`;
-  const c2 = `<div class="chart-card mb-4">
-    ${ptHead('Monitoring saldo piutang Non Kogol 1 &amp; 2', `Per ULP, SOREK ${esc(bln)}, posisi ${esc(m.stamp)}`,
-      `Saldo Piutang - Monitoring Non Kogol 1 dan 2 - posisi ${m.stamp}`)}
-    <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat semua kolom.</div>
+  const s2 = `<section class="pt-sec">
+    <h6 class="pt-sec-title">Monitoring per ULP</h6>${hint}
     <div class="pt-wrap" tabindex="0" aria-label="Tabel monitoring saldo piutang, dapat digeser"><table class="pt-table">
       <thead><tr><th rowspan="2" class="pt-unit" scope="col">Unit</th>
         <th colspan="2" class="s" scope="colgroup">SOREK (saldo awal)</th><th colspan="2" class="s" scope="colgroup">Pelunasan s.d. hari ini</th>
@@ -2391,61 +2398,53 @@ function ptRenderHarian() {
         <th colspan="2" class="s" scope="colgroup">Progres pelunasan</th><th rowspan="2" class="s" scope="col">Peringkat</th></tr>
         <tr>${ptPair('Lbr', 'Rp')}${ptPair('Lbr', 'Rp')}${ptPair('Lbr', 'Rp')}${kolomHari ? ptPair('Lbr', 'Rp') : ''}${ptPair('Lbr', 'Rp')}</tr></thead>
       <tbody>${m.ulp.map((u) => `<tr>${ptUnitTh(u)}${baris2(u)}</tr>`).join('')}</tbody>
-      <tfoot><tr>${ptUnitTh(up3)}${baris2(up3)}</tr></tfoot></table></div></div>`;
+      <tfoot><tr>${ptUnitTh(up3)}${baris2(up3)}</tr></tfoot></table></div></section>`;
 
-  // 3. Sisa saldo harian bulan ini (dari catatan PIUTANG_LOG)
-  const titik = m.harian.filter((p) => p.rp != null);
-  const blnData = ptBulan(m.bulanData) || bln;
-  const c3 = `<div class="chart-card mb-4">
-    ${ptHead(`Sisa saldo harian ${esc(blnData)}, UP3`, 'Non Kogol 1 &amp; 2, catatan terakhir tiap hari DB_TAGLIS diperbarui',
-      titik.length >= 2 ? `Saldo Piutang - Sisa saldo harian ${blnData}` : '')}
-    ${titik.length >= 2
-      ? `<div class="pt-chart"><canvas id="pt-chart-harian" role="img" aria-label="Sisa saldo UP3 per hari: ${esc(titik.map((p) => `${dtTgl(dtDate(p.tgl))} ${ptRp(p.rp)}`).join(', '))}"></canvas></div>`
-      : `<div class="pt-empty">Baru ada catatan ${esc(m.stamp)} (sisa ${esc(ptRp(up3.sisa.rp))}). Grafik ini terisi setelah tab DB_TAGLIS diperbarui di hari berikutnya.</div>`}
-  </div>`;
+  // 3. Pelunasan harian dari tab REKAP_PELUNASAN (isi diatur ptRenderHari)
+  const s3 = `<section class="pt-sec">
+    <div class="pt-head"><div><h6 class="pt-sec-title" id="pt-hari-title"></h6><div class="dt-sub" id="pt-hari-sub"></div></div>
+      ${m.rekap.tanggal.length ? pilihUnit('pt-hari-unit') : ''}</div>
+    <ul class="dt-facts" id="pt-hari-facts"></ul><div id="pt-hari-box"></div></section>`;
 
-  // 4. Sisa per kogol (Excel: kolom Kogol 0 / 2 / 3 / 4 / Total)
+  // 4. Sisa per kogol, urutan kolom seperti Excel: Kogol 0, 2, 3, 4, lalu total Non Kogol 1 & 2 (0, 3, 4)
   const baris4 = (u) => {
     const s = u.saldo;
     return `${ptTd(s[0][0], 's')}${ptTd(s[0][1])}${ptTd(s[0][2])}${ptTd(s[0][1] + s[0][2], 'b')}`
-      + `${ptTd(s[3][0], 's')}${ptTd(s[3][1] + s[3][2])}${ptTd(s[4][0], 's')}${ptTd(s[4][1] + s[4][2])}`
-      + `${ptTd(u.sisa.lbr, 's')}${ptTd(u.sisa.rp, 'b')}${ptTd(s[2][0], 's')}${ptTd(s[2][1] + s[2][2])}`;
+      + `${ptTd(s[2][0], 's')}${ptTd(s[2][1] + s[2][2])}${ptTd(s[3][0], 's')}${ptTd(s[3][1] + s[3][2])}`
+      + `${ptTd(s[4][0], 's')}${ptTd(s[4][1] + s[4][2])}${ptTd(u.sisa.lbr, 's')}${ptTd(u.sisa.rp, 'b')}`;
   };
-  const c4 = `<div class="chart-card mb-4">
-    ${ptHead('Sisa saldo per kogol', `Per ULP, posisi ${esc(m.stamp)}`,
-      `Saldo Piutang - Sisa per kogol - posisi ${m.stamp}`)}
-    <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat semua kolom.</div>
+  const s4 = `<section class="pt-sec">
+    <h6 class="pt-sec-title">Sisa saldo per kogol</h6>${hint}
     <div class="pt-wrap" tabindex="0" aria-label="Tabel sisa saldo per kogol, dapat digeser"><table class="pt-table">
       <thead><tr><th rowspan="2" class="pt-unit" scope="col">Unit</th><th colspan="4" class="s" scope="colgroup">Kogol 0</th>
-        <th colspan="2" class="s" scope="colgroup">Kogol 3</th><th colspan="2" class="s" scope="colgroup">Kogol 4</th>
-        <th colspan="2" class="s" scope="colgroup">Total Non Kogol 1 &amp; 2</th><th colspan="2" class="s" scope="colgroup">Kogol 2</th></tr>
+        <th colspan="2" class="s" scope="colgroup">Kogol 2</th><th colspan="2" class="s" scope="colgroup">Kogol 3</th>
+        <th colspan="2" class="s" scope="colgroup">Kogol 4</th><th colspan="2" class="s" scope="colgroup">Total Non Kogol 1 &amp; 2</th></tr>
         <tr><th scope="col" class="s">Lbr</th><th scope="col">RPPTL</th><th scope="col">TAGSUS</th><th scope="col">Total</th>
         ${ptPair('Lbr', 'Rp')}${ptPair('Lbr', 'Rp')}${ptPair('Lbr', 'Rp')}${ptPair('Lbr', 'Rp')}</tr></thead>
       <tbody>${m.ulp.map((u) => `<tr>${ptUnitTh(u)}${baris4(u)}</tr>`).join('')}</tbody>
-      <tfoot><tr>${ptUnitTh(up3)}${baris4(up3)}</tr></tfoot></table></div></div>`;
+      <tfoot><tr>${ptUnitTh(up3)}${baris4(up3)}</tr></tfoot></table></div></section>`;
 
-  // 5. Saldo akhir bulan dan saldo rata-rata akhir bulan terhadap target
+  // 5. Saldo rata-rata akhir bulan terhadap target
   const lewat = m.bi > 0 ? `${DT_BLN[0]} s.d. ${DT_BLN[m.bi - 1]}` : '';
-  const baris5 = (u) => `${ptTd(u.akhir.target, 's')}${ptTd(u.akhir.real)}<td>${ptPill(u.akhir.capai)}</td>`
-    + `${ptTd(u.rata.target, 's')}${ptTd(u.rata.real)}<td>${ptPill(u.rata.capai)}</td>`;
-  const pilihan = m.units.map((u) => `<option value="${esc(u.kode)}">${esc(u.nama)}</option>`).join('');
-  const c5 = `<div class="chart-card mb-4" id="pt-target-card">
-    ${ptHead('Saldo akhir dan saldo rata-rata terhadap target', `Per ULP, posisi ${esc(m.stamp)}`,
-      `Saldo Piutang - Saldo akhir dan rata-rata ${bln} - posisi ${m.stamp}`)}
-    <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat semua kolom.</div>
-    <div class="pt-wrap mb-3" tabindex="0" aria-label="Tabel saldo akhir dan saldo rata-rata, dapat digeser"><table class="pt-table">
-      <thead><tr><th rowspan="2" class="pt-unit" scope="col">Unit</th><th colspan="3" class="s" scope="colgroup">Saldo akhir ${esc(bln)}</th>
-        <th colspan="3" class="s" scope="colgroup">Saldo rata-rata akhir bulan${lewat ? ' (' + esc(lewat) + ')' : ''}</th></tr>
-        <tr><th scope="col" class="s">Target</th><th scope="col">Sisa saat ini</th><th scope="col">Pencapaian</th>
-        <th scope="col" class="s">Target</th><th scope="col">Realisasi</th><th scope="col">Pencapaian</th></tr></thead>
+  const baris5 = (u) => `${ptTd(u.rata.target, 's')}${ptTd(u.rata.real)}<td>${ptPill(u.rata.capai)}</td>`;
+  const s5 = `<section class="pt-sec">
+    <h6 class="pt-sec-title">Saldo rata-rata akhir bulan terhadap target</h6>${hint}
+    <div class="pt-wrap mb-3" tabindex="0" aria-label="Tabel saldo rata-rata akhir bulan, dapat digeser"><table class="pt-table">
+      <thead><tr><th class="pt-unit" scope="col">Unit</th><th scope="col" class="s">Target</th>
+        <th scope="col">Realisasi${lewat ? ' (' + esc(lewat) + ')' : ''}</th><th scope="col">Pencapaian</th></tr></thead>
       <tbody>${m.ulp.map((u) => `<tr>${ptUnitTh(u)}${baris5(u)}</tr>`).join('')}</tbody>
       <tfoot><tr>${ptUnitTh(up3)}${baris5(up3)}</tr></tfoot></table></div>
-    <div class="pt-head"><div><h6 class="dt-title" id="pt-rata-title"></h6><div class="dt-sub" id="pt-rata-sub"></div></div>
-      <div class="pt-tools no-capture"><div class="dt-field"><label for="pt-rata-unit">Unit</label>
-        <select id="pt-rata-unit" class="form-select form-select-sm filter-control">${pilihan}</select></div></div></div>
-    <div class="pt-chart" id="pt-rata-box"></div></div>`;
+    <div class="pt-head"><div><h6 class="pt-chart-title" id="pt-rata-title"></h6><div class="dt-sub" id="pt-rata-sub"></div></div>
+      ${pilihUnit('pt-rata-unit')}</div>
+    <div class="pt-chart" id="pt-rata-box"></div></section>`;
 
-  // 6. Saldo piutang lancar per kogol (Excel: Pencapaian Saldo Piutang Lancar)
+  // Bagian 1 s.d. 5 dalam satu kartu dengan satu tombol unduh gambar.
+  const c1 = `<div class="chart-card mb-4" id="pt-harian-card">
+    ${ptHead(`Saldo piutang Non Kogol 1 &amp; 2, SOREK ${esc(bln)}`, `Kogol 0, 3 dan 4 per ULP, posisi ${esc(m.stamp)}`,
+      `Saldo Piutang - Harian ${bln} - posisi ${m.stamp}`)}
+    ${s1}${s2}${s3}${s4}${s5}</div>`;
+
+  // Saldo piutang lancar per kogol (Excel: Pencapaian Saldo Piutang Lancar), kartu sendiri
   const c6 = `<div class="chart-card mb-4" id="pt-lancar-card">
     ${ptHead(`<span id="pt-lancar-title"></span>`, `RPPTL per ULP, SOREK ${esc(bln)}, posisi ${esc(m.stamp)}`,
       'Saldo Piutang - Saldo piutang lancar',
@@ -2455,11 +2454,12 @@ function ptRenderHarian() {
     <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat semua kolom.</div>
     <div class="pt-wrap" tabindex="0" aria-label="Tabel saldo piutang lancar, dapat digeser" id="pt-lancar-body"></div></div>`;
 
-  $('pt-v-harian').innerHTML = c1 + c2 + c3 + c4 + c5 + c6;
+  $('pt-v-harian').innerHTML = c1 + c6;
   $('pt-rata-unit').value = PT.rataUnit || up3.kode;
+  if ($('pt-hari-unit')) $('pt-hari-unit').value = PT.hariUnit || up3.kode;
   ptRenderLancar();
   ptRenderRata();
-  ptChartHarian(titik);
+  ptRenderHari();
 }
 
 function ptRenderLancar() {
@@ -2541,29 +2541,49 @@ function ptRenderRata() {
   });
 }
 
-function ptChartHarian(titik) {
-  const el = $('pt-chart-harian');
-  if (!el || !window.Chart) return;
+/** Pelunasan harian (RPPTL per TGLBUKU) untuk unit terpilih, dari tab REKAP_PELUNASAN. */
+function ptRenderHari() {
+  const m = PT.m;
+  const r = m.rekap;
+  if (PT.charts.hari) { PT.charts.hari.destroy(); delete PT.charts.hari; }
+  const box = $('pt-hari-box');
+  const u = m.units.find((x) => x.kode === (PT.hariUnit || m.up3.kode)) || m.up3;
+  const seri = r.unit[u.kode];
+  $('pt-hari-title').textContent = `Pelunasan harian${r.bulan ? ' ' + ptBulan(r.bulan) : ''}${r.tanggal.length ? ', ' + u.nama : ''}`;
+  $('pt-hari-sub').textContent = r.tanggal.length ? `RPPTL per tanggal buku, s.d. ${dtTgl(dtDate(r.tanggal[r.tanggal.length - 1]), true)}` : '';
+  if (!r.tanggal.length || !seri) {
+    $('pt-hari-facts').innerHTML = '';
+    box.className = 'pt-empty';
+    box.textContent = r.catatan || `Rekap pelunasan tidak memuat ${u.nama}.`;
+    return;
+  }
+  const tot = ptJumlah(seri);
+  const iMax = seri.reduce((b, x, i) => (x[1] > seri[b][1] ? i : b), 0);
+  $('pt-hari-facts').innerHTML = `<li><b>${ptRp(tot[1])}</b>Terlunasi, ${ptNum(tot[0])} lbr</li>
+    <li><b>${ptRp(tot[1] / seri.length)}</b>Rata-rata per hari (${seri.length} hari)</li>
+    <li><b>${ptRp(seri[iMax][1])}</b>Tertinggi, ${dtTgl(dtDate(r.tanggal[iMax]))}</li>`;
+  const hari = (t) => `${DT_HARI_PANJANG[dtDow(dtDate(t))]}, ${dtTgl(dtDate(t), true)}`;
+  box.className = 'pt-chart';
+  box.innerHTML = `<canvas id="pt-chart-hari" role="img" aria-label="${esc(`Pelunasan harian ${u.nama}: ` + r.tanggal.map((t, i) => `${dtTgl(dtDate(t))} ${ptRp(seri[i][1])}`).join(', '))}"></canvas>`;
+  if (!window.Chart) return;
   Chart.defaults.font.family = "'Poppins', sans-serif";
   Chart.defaults.color = '#64748b';
-  PT.charts.harian = new Chart(el, {
-    type: 'line',
-    plugins: window.ChartDataLabels ? [ChartDataLabels] : [],
+  PT.charts.hari = new Chart($('pt-chart-hari'), {
+    type: 'bar',
     data: {
-      labels: titik.map((p) => dtTgl(dtDate(p.tgl))),
-      datasets: [{ label: 'Sisa saldo', data: titik.map((p) => p.rp), borderColor: NAVY, backgroundColor: 'rgba(18,93,114,.12)', fill: true,
-        borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: NAVY, tension: 0.25 }],
+      labels: r.tanggal.map((t) => String(dtDate(t).getUTCDate())),
+      datasets: [{ label: 'Pelunasan RPPTL', data: seri.map((x) => x[1]), backgroundColor: NAVY, borderRadius: 4, maxBarThickness: 28 }],
     },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 18, right: 30 } },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 8 } },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (c) => ` ${rupiah(c.parsed.y)}, ${ptNum(titik[c.dataIndex].lbr)} lbr` } },
-        datalabels: { display: (c) => c.dataIndex === titik.length - 1, align: 'top', anchor: 'end', color: NAVY, font: { size: 10, weight: 'bold' }, formatter: (x) => npsNum(x) },
+        datalabels: { display: false },
+        tooltip: { callbacks: { title: (it) => hari(r.tanggal[it[0].dataIndex]), label: (c) => ` ${rupiah(c.parsed.y)}, ${ptNum(seri[c.dataIndex][0])} lbr` } },
       },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' }, maxRotation: 0, autoSkip: true } },
-        y: { beginAtZero: true, grace: '10%', ticks: { font: { size: 10 }, callback: (x) => npsNum(x) } },
+        y: { beginAtZero: true, grace: '8%', ticks: { font: { size: 10 }, callback: (x) => npsNum(x) } },
       },
     },
   });
@@ -2627,6 +2647,7 @@ function ptInit() {
   $('page-piutang').addEventListener('change', (e) => {
     if (e.target.name === 'pt-lancar') { PT.lancar = e.target.value; ptRenderLancar(); }
     if (e.target.id === 'pt-rata-unit') { PT.rataUnit = e.target.value; ptRenderRata(); }
+    if (e.target.id === 'pt-hari-unit') { PT.hariUnit = e.target.value; ptRenderHari(); }
   });
   $('page-piutang').addEventListener('click', (e) => {
     if (e.target.closest('[data-pt-retry]')) { PT.error = ''; renderPt(); loadPt(); }
