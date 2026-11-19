@@ -2522,7 +2522,8 @@ function ptRenderRata() {
     plugins: window.ChartDataLabels ? [ChartDataLabels] : [],
     data: { labels, datasets: ds },
     options: {
-      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, layout: { padding: { top: 18 } },
+      // Kanan diberi ruang supaya label titik bulan berjalan (paling kanan) tidak terpotong.
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, layout: { padding: { top: 18, right: 30 } },
       plugins: {
         legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, font: { size: 10, weight: '600' } } },
         tooltip: { filter: (c) => c.parsed.y != null && !(c.datasetIndex === 1 && c.dataIndex === n - 1),
@@ -2554,7 +2555,7 @@ function ptChartHarian(titik) {
         borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: NAVY, tension: 0.25 }],
     },
     options: {
-      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 18 } },
+      responsive: true, maintainAspectRatio: false, layout: { padding: { top: 18, right: 30 } },
       plugins: {
         legend: { display: false },
         tooltip: { callbacks: { label: (c) => ` ${rupiah(c.parsed.y)}, ${ptNum(titik[c.dataIndex].lbr)} lbr` } },
