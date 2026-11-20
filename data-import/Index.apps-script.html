@@ -392,6 +392,19 @@
     .pt-mini .trk span { display: block; height: 100%; background: #125D72; }
     .pt-chart { position: relative; height: 260px; }
     .pt-empty { font-size: .8rem; font-weight: 600; color: #475569; padding: 14px 0 4px; }
+    /* Tema per kartu (warna dari style kartu, lihat PT_TEMA): pita judul bergradasi seperti kartu KPI NPS,
+       kepala tabel, baris UP3, penanda judul bagian dan grafik ikut warna kartunya. */
+    .pt-tema .pt-band { margin: -16px -16px 14px; padding: 14px 16px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, var(--g1), var(--g2)); }
+    .pt-band .dt-title, .pt-band .dt-sub, .pt-band .dt-lbl { color: #fff; }
+    .pt-band .btn-shot { border-color: transparent; color: var(--th); }
+    .pt-band + .pt-sec { margin-top: 0; padding-top: 4px; border-top: 0; }   /* pita sudah memisahkan, tanpa garis dobel */
+    .pt-tema .pt-table thead th { background: var(--th); }
+    .pt-tema .pt-table tfoot th, .pt-tema .pt-table tfoot td { background: var(--ts); color: var(--ti); border-top-color: var(--th); }
+    .pt-tema .pt-wrap:focus-visible { outline-color: var(--th); }
+    .pt-tema .pt-rank li.up3 { background: var(--ts); }
+    .pt-tema .pt-rank li.up3 .nm { color: var(--ti); }
+    .pt-tema .pt-mini .trk span { background: var(--th); }
+    .pt-tema .pt-sec-title::before { content: ''; display: inline-block; width: 4px; height: .95em; margin-right: 8px; border-radius: 2px; background: var(--th); vertical-align: -2px; }
     @media (max-width: 575.98px) {
       .pt-rank li { grid-template-columns: 18px minmax(64px, 92px) minmax(30px, 1fr) 70px; gap: 8px; padding: 6px 4px; }
       .pt-stamp { margin-left: 0; }
@@ -2125,8 +2138,18 @@ const PT_SISA = [0, 3, 4];          // "Non Kogol 1 & 2": kogol yang dihitung di
 const PT_EX1 = [0, 2, 3, 4];        // "tanpa Kogol 1" di saldo piutang lancar
 const PT_SEMUA = [0, 1, 2, 3, 4];
 const PT_LEMBAR = ['1 lembar', '2 lembar', '>2 lembar'];
-// Grafik saldo rata-rata: satu warna per kategori. Target oranye sama dengan garis target di halaman NPS.
-const PT_RATA_WARNA = { real: NAVY, kini: '#7C3AED', target: NPS_TARGET };
+// Satu tema warna per kartu, dari keluarga warna kartu KPI halaman NPS. Ujung gradasi digelapkan seperlunya supaya
+// teks putih di pita judul tetap >= 4.5:1. th = kepala tabel, ts/ti = latar dan teks baris UP3, main = warna grafik.
+const PT_TEMA = {
+  harian: { g1: '#2C3E50', g2: '#4B6CB7', th: '#3D5A99', ts: '#E9EEF8', ti: '#2C4A86', main: '#4B6CB7' },
+  rata: { g1: '#4338CA', g2: '#7C3AED', th: '#4F46E5', ts: '#EEF0FD', ti: '#4338CA', main: '#4F46E5' },
+  lancar: { g1: '#047857', g2: '#0369A1', th: '#047857', ts: '#E6F4EF', ti: '#047857', main: '#059669' },
+  kogol: { g1: '#0369A1', g2: '#2563EB', th: '#1D4ED8', ts: '#EAF1FE', ti: '#1D4ED8', main: '#2563EB' },
+  nonkogol: { g1: '#9F1239', g2: '#DB2777', th: '#BE185D', ts: '#FDEEF4', ti: '#BE185D', main: '#DB2777' },
+};
+const ptGaya = (k) => { const t = PT_TEMA[k]; return `--g1:${t.g1};--g2:${t.g2};--th:${t.th};--ts:${t.ts};--ti:${t.ti}`; };
+// Grafik saldo rata-rata: realisasi warna kartunya, bulan berjalan hijau toska, target oranye seperti di halaman NPS.
+const PT_RATA_WARNA = { real: PT_TEMA.rata.main, kini: '#0F766E', target: NPS_TARGET };
 const PT_LANCAR = [
   { key: 'saldo', name: 'Saldo' },
   { key: 'sorek', name: 'SOREK' },
@@ -2166,7 +2189,7 @@ const ptPill = (x) => (x == null || !isFinite(x)
 const ptMini = (x) => (x == null || !isFinite(x) ? '–'
   : `<span class="pt-mini"><span class="trk" aria-hidden="true"><span style="width:${(Math.max(0, Math.min(1, x)) * 100).toFixed(1)}%"></span></span>${ptPct(x)}</span>`);
 const ptUnitTh = (u) => `<th scope="row">${u.up3 ? '' : `<span class="pt-code">${esc(u.kode)}</span> `}${esc(u.nama)}</th>`;
-const ptHead = (title, sub, shot, tools = '') => `<div class="pt-head"><div><h6 class="dt-title">${title}</h6><div class="dt-sub">${sub}</div></div>
+const ptHead = (title, sub, shot, tools = '') => `<div class="pt-head pt-band"><div><h6 class="dt-title">${title}</h6><div class="dt-sub">${sub}</div></div>
   <div class="pt-tools">${tools}${shot ? shotBtn(shot) : ''}</div></div>`;
 const ptPair = (a, b) => `<th scope="col" class="s">${a}</th><th scope="col">${b}</th>`;
 
@@ -2472,7 +2495,7 @@ function ptRenderHarian() {
       <tfoot><tr>${ptUnitTh(up3)}${baris4(up3)}</tr></tfoot></table></div></section>`;
 
   // Bagian 1 s.d. 4 dalam satu kartu dengan satu tombol unduh gambar.
-  const c1 = `<div class="chart-card mb-4" id="pt-harian-card">
+  const c1 = `<div class="chart-card mb-4 pt-tema" id="pt-harian-card" style="${ptGaya('harian')}">
     ${ptHead(`Saldo piutang Non Kogol 1 &amp; 2, SOREK ${esc(bln)}`, `Kogol 0, 3 dan 4 per ULP, posisi ${esc(m.stamp)}`,
       `Saldo Piutang - Harian ${bln} - posisi ${m.stamp}`)}
     ${s1}${s2}${s3}${s4}</div>`;
@@ -2480,7 +2503,7 @@ function ptRenderHarian() {
   // Saldo rata-rata akhir bulan terhadap target: tabel dan grafik per unit, kartu sendiri dengan tombol unduh sendiri.
   const lewat = m.bi > 0 ? `${DT_BLN[0]} s.d. ${DT_BLN[m.bi - 1]}` : '';
   const baris5 = (u) => `${ptTd(u.rata.target, 's')}${ptTd(u.rata.real)}<td>${ptPill(u.rata.capai)}</td>`;
-  const c5 = `<div class="chart-card mb-4" id="pt-rata-card">
+  const c5 = `<div class="chart-card mb-4 pt-tema" id="pt-rata-card" style="${ptGaya('rata')}">
     ${ptHead('Saldo rata-rata akhir bulan terhadap target', `Per ULP, posisi ${esc(m.stamp)}`, 'Saldo Piutang - Saldo rata-rata akhir bulan')}
     ${hint}
     <div class="pt-wrap" tabindex="0" aria-label="Tabel saldo rata-rata akhir bulan, dapat digeser"><table class="pt-table">
@@ -2494,7 +2517,7 @@ function ptRenderHarian() {
       <div class="pt-chart" id="pt-rata-box"></div></section></div>`;
 
   // Saldo piutang lancar per kogol (Excel: Pencapaian Saldo Piutang Lancar), kartu sendiri
-  const c6 = `<div class="chart-card mb-4" id="pt-lancar-card">
+  const c6 = `<div class="chart-card mb-4 pt-tema" id="pt-lancar-card" style="${ptGaya('lancar')}">
     ${ptHead(`<span id="pt-lancar-title"></span>`, `RPPTL per ULP, SOREK ${esc(bln)}, posisi ${esc(m.stamp)}`,
       'Saldo Piutang - Saldo piutang lancar',
       `<div class="dt-field no-capture"><span class="dt-lbl" id="pt-lancar-lbl">Tampilkan</span>
@@ -2638,7 +2661,7 @@ function ptRenderHari() {
     type: 'bar',
     data: {
       labels: hariKe.map(String),
-      datasets: [{ label: 'Pelunasan RPPTL', data: isi.map((x) => (x ? x[1] : null)), backgroundColor: NAVY, borderRadius: 4, maxBarThickness: 28 }],
+      datasets: [{ label: 'Pelunasan RPPTL', data: isi.map((x) => (x ? x[1] : null)), backgroundColor: PT_TEMA.harian.main, borderRadius: 4, maxBarThickness: 28 }],
     },
     options: {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 8 } },
@@ -2681,7 +2704,7 @@ function ptRenderKogol23() {
         <tfoot><tr><th scope="row">Total Kogol ${s.kogol}</th>${baris(s.g, s.total)}</tr></tfoot></table></div>`}</section>`;
   };
   // Kogol 2 dan 3 dalam satu kartu dengan satu tombol unduh gambar.
-  $('pt-v-kogol23').innerHTML = `<div class="chart-card mb-4" id="pt-kogol23-card">
+  $('pt-v-kogol23').innerHTML = `<div class="chart-card mb-4 pt-tema" id="pt-kogol23-card" style="${ptGaya('kogol')}">
     ${ptHead('Tunggakan Kogol 2 &amp; 3 per satker', `Menurut jumlah lembar, posisi ${esc(m.stamp)}`,
       m.satker.every(kosong) ? '' : `Saldo Piutang - Kogol 2 dan 3 per satker - posisi ${m.stamp}`)}
     ${m.satker.map(bagian).join('')}</div>`;
@@ -2695,7 +2718,7 @@ function ptRenderNonKogol() {
   const baris = (u) => `${ptTd(u.sorek.lbr, 's')}${ptTd(u.sorek.rp)}`
     + u.lembar.map((x) => `${ptTd(x[0], 's')}${ptTd(x[1])}`).join('')
     + `${ptTd(u.sisa.lbr, 's b')}${ptTd(u.sisa.rp, 'b')}${ptTdPct(u.prog.lbr, 's')}<td>${ptMini(u.prog.rp)}</td>`;
-  $('pt-v-nonkogol').innerHTML = `<div class="chart-card mb-4">
+  $('pt-v-nonkogol').innerHTML = `<div class="chart-card mb-4 pt-tema" id="pt-nonkogol-card" style="${ptGaya('nonkogol')}">
     ${ptHead('Tagihan Non-Kogol 1 &amp; 2 per jumlah lembar', `Kogol 0, 3 dan 4 per ULP, posisi ${esc(m.stamp)}`,
       `Saldo Piutang - Non-Kogol 1 dan 2 per lembar - posisi ${m.stamp}`)}
     <ul class="dt-facts">
