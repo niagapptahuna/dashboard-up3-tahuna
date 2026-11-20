@@ -331,9 +331,6 @@
     .pt-lv-biru { --lv: #93bdf3; --lv-t: #1d4ed8; }
     .pt-rank .bar span[class^="pt-lv-"] { background: var(--lv); }
     .pt-rank .val [class^="pt-lv-"], .dt-facts b[class^="pt-lv-"] { color: var(--lv-t); }
-    .pt-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; padding: 0; list-style: none; font-size: .7rem; font-weight: 600; color: #475569; }
-    .pt-legend li { display: inline-flex; align-items: center; gap: 5px; }
-    .pt-legend i { width: 12px; height: 8px; border-radius: 2px; background: var(--lv); }
     .pt-rank li.up3 { background: #e6f2f5; }
     /* UP3 di bawah, terpisah dari peringkat ULP (bukan bagian urutan). */
     .pt-rank-total { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1; }
@@ -2296,10 +2293,6 @@ function ptLevel(x) {
   return v < 0.85 ? 'pt-lv-merah' : v <= 0.95 ? 'pt-lv-oranye' : v < 1 ? 'pt-lv-hijau' : 'pt-lv-biru';
 }
 
-const PT_LEGEND = `<ul class="pt-legend" aria-label="Arti warna progres">
-  <li><i class="pt-lv-merah"></i>&lt; 85%</li><li><i class="pt-lv-oranye"></i>85–95%</li>
-  <li><i class="pt-lv-hijau"></i>95–100%</li><li><i class="pt-lv-biru"></i>100%</li></ul>`;
-
 function ptRankRow(u) {
   const w = u.prog.rp == null ? 0 : Math.max(0, Math.min(1, u.prog.rp)) * 100;
   return `<li class="${u.up3 ? 'up3' : ''}"><span class="no">${u.up3 || u.rank == null ? '' : u.rank}</span><span class="nm">${esc(u.nama)}</span>
@@ -2327,7 +2320,7 @@ function ptRenderHarian() {
   </ul>`;
   const s1 = `<section class="pt-sec">
     <h6 class="pt-sec-title">Progres pelunasan per ULP</h6><div class="dt-sub">Rp terlunasi dari SOREK, urut tertinggi</div>
-    ${PT_LEGEND}${facts}<ul class="pt-rank" aria-label="Progres pelunasan per ULP, dari tertinggi">${urut.map(ptRankRow).join('')}</ul>
+    ${facts}<ul class="pt-rank" aria-label="Progres pelunasan per ULP, dari tertinggi">${urut.map(ptRankRow).join('')}</ul>
     <ul class="pt-rank pt-rank-total" aria-label="Progres pelunasan UP3">${ptRankRow(up3)}</ul></section>`;
 
   // 2. Monitoring per ULP (Excel: Monitoring Saldo Piutang Non Kogol 1 & 2)
