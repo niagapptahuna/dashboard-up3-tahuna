@@ -285,6 +285,27 @@
     /* Hari setelah posisi data: lingkaran kosong, beda bentuk dari titik abu-abu "nol". */
     .dt-dot.fut { background: transparent; box-shadow: inset 0 0 0 1px #94a3b8; }
     .dt-dn { font-size: .62rem; font-weight: 600; color: #64748b; line-height: 1; }
+
+    /* Tabel penyambungan harian per unit: baris ULP, kolom tanggal; Sabtu dan Minggu berlatar beda, Total menempel di kanan. */
+    .dt-hr-wrap { margin-top: 14px; }
+    .dt-hr { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .78rem; font-variant-numeric: tabular-nums; }
+    .dt-hr th, .dt-hr td { text-align: center; white-space: nowrap; border-bottom: 1px solid #eef2f6; }
+    .dt-hr thead th { position: sticky; top: 0; z-index: 2; background: #125D72; color: #fff; padding: 6px 3px; min-width: 40px; }
+    .dt-hr thead th.we { background: #0b4555; }
+    .dt-hr thead th.fut .dt-d { color: #b9d3da; }
+    .dt-hr thead th.dt-unit { left: 0; z-index: 3; text-align: left; padding-left: 12px; min-width: 150px; font-weight: 700; }
+    .dt-hr td { height: 34px; padding: 0 6px; font-weight: 700; color: #1e293b; }
+    .dt-hr td.we { background: #f3f5f9; }
+    .dt-hr td.dt-0 { color: #94a3b8; font-weight: 600; }
+    .dt-hr td.neg { color: #b91c1c; }
+    .dt-hr tbody th, .dt-hr tfoot th { position: sticky; left: 0; z-index: 1; background: #fff; text-align: left; font-weight: 600; color: #1e293b; padding: 0 10px 0 12px; }
+    .dt-hr .tot { position: sticky; right: 0; z-index: 1; min-width: 64px; padding: 0 10px; background: #e6f2f5; color: #125D72; font-weight: 800; border-left: 1px solid #cfe3e9; }
+    .dt-hr thead th.tot { z-index: 3; background: #0b4555; color: #fff; border-left-color: rgba(255,255,255,.25); }
+    .dt-hr tfoot th, .dt-hr tfoot td { height: 38px; font-weight: 800; color: #125D72; background: #e6f2f5; border-top: 2px solid #125D72; border-bottom: 0; }
+    .dt-hr tfoot td.we { background: #d9e8ed; }
+    .dt-hr tfoot td.dt-0 { color: #64748b; }
+    .dt-hr tfoot td.neg { color: #b91c1c; }
+    .dt-hr abbr { text-decoration: none; cursor: default; }
     @media (min-width: 992px) {
       .dt-bub { --min: 30px; --max: 58px; }
       .dt-cal td { height: 76px; }
@@ -303,6 +324,9 @@
       .dt-hint { display: block; }
       .dt-bub { --min: 26px; --max: 40px; font-size: .64rem; }
       .dt-cal td { height: 58px; }
+      .dt-hr thead th.dt-unit { min-width: 96px; padding-left: 10px; }
+      .dt-hr tbody th, .dt-hr tfoot th { padding: 0 6px 0 10px; }
+      .dt-hr .tot { min-width: 56px; padding: 0 6px; }
     }
     /* ── /Daftar Tunggu ── */
 
@@ -680,6 +704,8 @@
           <ul class="dt-facts" id="dt-cal-facts"></ul>
           <div id="dt-cal"></div>
         </div>
+        <div class="chart-card mb-4" id="dt-hr-pb"></div>
+        <div class="chart-card mb-4" id="dt-hr-daya"></div>
       </div>
     </section>
     <!-- ═════════ /DAFTAR TUNGGU ═════════ -->
@@ -1841,6 +1867,7 @@ function renderDt() {
   dtControls(true);
   dtRenderRekap();
   dtRenderCal();
+  dtRenderHarian();
 }
 
 function dtRenderRekap() {
@@ -1993,6 +2020,84 @@ function dtRenderCal() {
     <caption class="visually-hidden">${esc($('dt-cal-sub').textContent)}</caption>
     <thead><tr>${DT_HARI.map((h, i) => `<th scope="col"><abbr title="${DT_HARI_PANJANG[i]}">${h}</abbr></th>`).join('')}</tr></thead>
     ${body}</table>`;
+}
+
+/**
+ * Tabel penyambungan harian per unit, bulan berjalan: Pasang Baru (pelanggan) dan penambahan daya (VA).
+ * Aturan sama dengan kalender: hanya PEREMAJAAN, per TGLPEREMAJAAN. Nilai negatif (turun daya) tetap tampil
+ * supaya baris dan kolom Total tetap sama dengan jumlah selnya.
+ */
+function dtRenderHarian() {
+  const boxes = { pb: $('dt-hr-pb'), daya: $('dt-hr-daya') };
+  const bulan = (DT.res && (DT.res.bulan || String(DT.res.posisi || '').slice(0, 7))) || '';
+  Object.values(boxes).forEach((b) => { b.hidden = !bulan; });
+  if (!bulan) return;
+  const bulanText = `${DT_BLN_PANJANG[Number(bulan.slice(5, 7)) - 1]} ${bulan.slice(0, 4)}`;
+  const start = dtDate(bulan + '-01');
+  const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
+  const hari = Array.from({ length: end.getUTCDate() }, (_, i) => new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), i + 1)));
+  const pos = String(DT.res.posisi || '').slice(0, 10);
+  const lewat = (d) => !pos || dtIso(d) <= pos;
+  const sampai = pos && pos.slice(0, 7) === bulan && dtDate(pos) < end ? `, s.d. ${dtTgl(dtDate(pos), true)}` : '';
+  const done = DT.rows.filter((r) => r.status === DT_SELESAI && r.tgl.slice(0, 7) === bulan);
+  const posisi = dtPosisi();
+
+  [
+    { key: 'pb', nilai: (r) => (r.jenis === 'PB' ? 1 : 0), satuan: 'pelanggan', judul: 'Pasang Baru per unit',
+      sub: 'Pelanggan Pasang Baru berstatus PEREMAJAAN, per tanggal peremajaan' },
+    { key: 'daya', nilai: (r) => r.tambah, satuan: 'VA', judul: 'Penambahan daya per unit (VA)',
+      sub: 'DAYA dikurangi DAYA_LAMA dari Pasang Baru, Perubahan Daya dan Migrasi berstatus PEREMAJAAN, per tanggal peremajaan' },
+  ].forEach((t) => {
+    const val = {};   // val[ulp][hari ke-]
+    done.forEach((r) => {
+      const v = t.nilai(r);
+      if (!v) return;
+      const i = Number(r.tgl.slice(8, 10)) - 1;
+      const u = val[r.ulp] || (val[r.ulp] = hari.map(() => 0));
+      u[i] += v;
+    });
+    const nol = hari.map(() => 0);
+    const up3 = hari.map((_, i) => DT.ulps.reduce((s, u) => s + (val[u] || nol)[i], 0));
+    const jumlah = (a) => a.reduce((s, v) => s + v, 0);
+    const sel = (v, d, who) => {
+      const we = dtDow(d) >= 5 ? ' we' : '';
+      if (!lewat(d)) return `<td class="fut${we}"><span class="visually-hidden">belum ada data</span></td>`;
+      if (!v) return `<td class="dt-0${we}"><span aria-hidden="true">·</span><span class="visually-hidden">0</span></td>`;
+      const tip = `${who}, ${DT_HARI_PANJANG[dtDow(d)]} ${dtTgl(d, true)}: ${dtFmt(v)} ${t.satuan}`;
+      return `<td class="${v < 0 ? 'neg' : ''}${we}" title="${esc(tip)}">${dtFmt(v)}</td>`;
+    };
+    const baris = (a, who) => {
+      const n = jumlah(a);
+      return hari.map((d, i) => sel(a[i], d, who)).join('') + `<td class="tot${n ? '' : ' dt-0'}${n < 0 ? ' neg' : ''}">${dtFmt(n)}</td>`;
+    };
+    const head = `<thead><tr><th scope="col" class="dt-unit">Unit</th>${hari.map((d) => {
+      const cls = [dtDow(d) >= 5 ? 'we' : '', lewat(d) ? '' : 'fut'].filter(Boolean).join(' ');
+      return `<th scope="col"${cls ? ` class="${cls}"` : ''}><span class="dt-d">${d.getUTCDate()}</span><span class="dt-h"><abbr title="${DT_HARI_PANJANG[dtDow(d)]}">${DT_HARI[dtDow(d)]}</abbr></span></th>`;
+    }).join('')}<th scope="col" class="tot">Total</th></tr></thead>`;
+    const body = DT.ulps.map((u) => `<tr><th scope="row"><span class="dt-code">${esc((DT.res.codes || {})[u] || '')}</span>${esc(dtNama(u))}</th>${baris(val[u] || nol, dtNama(u))}</tr>`).join('');
+    const sub = `${t.sub}, ${bulanText}${sampai}`;
+    boxes[t.key].innerHTML = `
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+          <h6 class="dt-title">${esc(t.judul)}, ${esc(bulanText)}</h6>
+          <div class="dt-sub">${esc(sub)}</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="dt-total">${dtFmt(jumlah(up3))} ${t.satuan}</span>
+          ${shotBtn(`Daftar Tunggu - ${t.judul} - ${bulanText} - posisi ${posisi}`)}
+        </div>
+      </div>
+      <div class="dt-hr-wrap">
+        <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat tanggal berikutnya.</div>
+        <div class="dt-wrap" tabindex="0" role="region" aria-label="${esc(t.judul)} per tanggal, bisa digeser">
+          <table class="dt-hr">
+            <caption class="visually-hidden">${esc(t.judul)} per tanggal: ${esc(sub)}</caption>
+            ${head}<tbody>${body}</tbody>
+            <tfoot><tr><th scope="row">UP3 Tahuna</th>${baris(up3, 'UP3 Tahuna')}</tr></tfoot>
+          </table>
+        </div>
+      </div>`;
+  });
 }
 
 function dtInit() {
