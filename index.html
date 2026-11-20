@@ -2291,9 +2291,13 @@ function ptModel(res) {
     if (js.some((j) => j < 0)) return null;
     return js.reduce((a, j) => [a[0] + Number(e[1 + 2 * j]), a[1] + Number(e[2 + 2 * j])], [0, 0]);
   };
-  // Saldo akhir bulan yang sudah lewat: isian PIUTANG_INPUT; kalau kosong, catatan harian terakhir di bulan itu.
+  // Saldo akhir bulan yang sudah lewat: baris LANCAR+TAGSUS di sheet PERCEPATAN CASH IN (Dashboard Kinerja PP & AGA),
+  // dibaca Apps Script. Feed lama tanpa data itu memakai isian PIUTANG_INPUT. Kosong: catatan harian terakhir di bulan itu.
+  const K = res.kinerja && res.kinerja.unit ? res.kinerja : null;
+  const isianAkhir = (k, mm) => (K ? (K.unit[k] && K.unit[k][mm] != null ? K.unit[k][mm] : null) : ambil('saldoAkhir', k, (o) => o[mm]));
+  const sumberAkhir = K ? (K.sumber || 'Dashboard Kinerja PP & AGA') : `tab ${res.inputSheet || 'PIUTANG_INPUT'}`;
   const akhirBulan = (k, mm) => {
-    const isian = ambil('saldoAkhir', k, (o) => o[mm]);
+    const isian = isianAkhir(k, mm);
     if (isian != null) return isian;
     const ym = bulan.slice(0, 4) + '-' + String(mm + 1).padStart(2, '0');
     const v = dariLog(log.entri.filter((x) => x[0].slice(0, 7) === ym).pop(), k);
@@ -2315,24 +2319,25 @@ function ptModel(res) {
     const p = dariLog(lalu, k);
     u.hari = p ? { lbr: p[0] - u.sisa.lbr, rp: p[1] - u.sisa.rp } : null;
 
-    // Saldo rata-rata akhir bulan: rata-rata saldo akhir bulan-bulan yang sudah lewat.
+    // Saldo rata-rata akhir bulan: Jan s.d. bulan berjalan. Bulan yang sudah lewat dari saldo akhirnya,
+    // bulan berjalan memakai sisa saldo Non Kogol 1 & 2 hari ini.
     const hist = [];
     for (let mm = 0; mm < Math.max(bi, 0); mm++) hist.push(pilih(k, (x) => akhirBulan(x, mm)));
     const ada = hist.filter((v) => v != null);
     const rata = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
     const tRata = pilih(k, (x) => ambil('target', x, (o) => o.saldoRata));
     u.rata = {
-      target: tRata, real: rata(ada), n: ada.length, kosong: hist.length - ada.length,
+      target: tRata, real: bi >= 0 ? rata(ada.concat(u.sisa.rp)) : null, n: ada.length, kosong: hist.length - ada.length,
       seri: hist.map((_, mm) => rata(hist.slice(0, mm + 1).filter((v) => v != null))),
-      sementara: rata(ada.concat(u.sisa.rp)),
     };
+    u.rata.sementara = u.rata.real;   // titik bulan berjalan di grafik
     u.rata.capai = tRata && u.rata.real != null ? Math.max(0, 2 - u.rata.real / tRata) : null;
   });
   const ulp = units.filter((u) => !u.up3);
   [...ulp].sort((a, b) => (b.prog.rp ?? -1) - (a.prog.rp ?? -1)).forEach((u, i) => { u.rank = u.prog.rp == null ? null : i + 1; });
-  // Saldo rata-rata UP3 = jumlah rata-rata ULP (seperti Excel), kecuali baris UP3 di PIUTANG_INPUT diisi sendiri.
+  // Saldo rata-rata UP3 = jumlah rata-rata ULP (seperti Excel), kecuali saldo akhir UP3 tersedia sendiri.
   const u3 = units[units.length - 1];
-  if (!Array.from({ length: Math.max(bi, 0) }, (_, mm) => ambil('saldoAkhir', up3, (o) => o[mm])).some((v) => v != null)) {
+  if (!Array.from({ length: Math.max(bi, 0) }, (_, mm) => isianAkhir(up3, mm)).some((v) => v != null)) {
     const tot = (f) => (ulp.every((u) => f(u) != null) ? ulp.reduce((a, u) => a + f(u), 0) : null);
     u3.rata.real = tot((u) => u.rata.real);
     u3.rata.seri = u3.rata.seri.map((_, mm) => tot((u) => u.rata.seri[mm]));
@@ -2369,6 +2374,7 @@ function ptModel(res) {
   const tanpaSorek = ulp.filter((u) => u.sorek.lbr == null || u.sorek.rp == null).map((u) => u.nama);
   if (tanpaSorek.length) warn.push(`SOREK LBR dan RP belum diisi di tab ${inp} untuk ${tanpaSorek.join(', ')}.`);
   if (res.log && res.log.error) warn.push(res.log.error);
+  if (res.kinerja && res.kinerja.catatan) warn.push(res.kinerja.catatan);
   const lewat = res.dilewati || {};
   if (lewat.unitLain) warn.push(`${ptNum(lewat.unitLain)} baris DB_TAGLIS dengan UNITUP di luar UP3 Tahuna tidak dihitung.`);
   if (lewat.kogolLain) warn.push(`${ptNum(lewat.kogolLain)} baris DB_TAGLIS dengan KOGOL kosong atau di luar 0 s.d. 4 tidak dihitung.`);
@@ -2385,7 +2391,7 @@ function ptModel(res) {
   }
 
   return {
-    units, ulp, up3: units[units.length - 1], satker, warn, bulan, bi, rekap,
+    units, ulp, up3: units[units.length - 1], satker, warn, bulan, bi, rekap, sumberAkhir,
     stamp: ptWaktu(waktu),
     lalu: lalu ? lalu[0] : '',
   };
@@ -2559,10 +2565,14 @@ function ptRenderHarian() {
     ${s1}${s2}${s3}${s4}</div>`;
 
   // Saldo rata-rata akhir bulan terhadap target: tabel dan grafik per unit, kartu sendiri dengan tombol unduh sendiri.
-  const lewat = m.bi > 0 ? `${DT_BLN[0]} s.d. ${DT_BLN[m.bi - 1]}` : '';
+  // Realisasi = rata-rata Jan s.d. bulan berjalan; bulan berjalan dari sisa saldo Non Kogol 1 & 2 hari ini.
+  const lewat = m.bi > 0 ? `${DT_BLN[0]} s.d. ${DT_BLN[m.bi]}` : m.bi === 0 ? DT_BLN[0] : '';
+  const sumberRata = m.bi > 0
+    ? `Saldo akhir ${DT_BLN[0]} s.d. ${DT_BLN[m.bi - 1]}: ${m.sumberAkhir}. ${DT_BLN[m.bi]}: sisa saldo Non Kogol 1 & 2 posisi ${m.stamp}.`
+    : `Per ULP, posisi ${m.stamp}`;
   const baris5 = (u) => `${ptTd(u.rata.target, 's')}${ptTd(u.rata.real)}<td>${ptPill(u.rata.capai)}</td>`;
   const c5 = `<div class="chart-card mb-4 pt-tema" id="pt-rata-card" style="${ptGaya('rata')}">
-    ${ptHead('Saldo rata-rata akhir bulan terhadap target', `Per ULP, posisi ${esc(m.stamp)}`, 'Saldo Piutang - Saldo rata-rata akhir bulan')}
+    ${ptHead('Saldo rata-rata akhir bulan terhadap target', esc(sumberRata), 'Saldo Piutang - Saldo rata-rata akhir bulan')}
     ${hint}
     <div class="pt-wrap" tabindex="0" aria-label="Tabel saldo rata-rata akhir bulan, dapat digeser"><table class="pt-table">
       <thead><tr><th class="pt-unit" scope="col">Unit</th><th scope="col" class="s">Target</th>
@@ -2589,7 +2599,7 @@ function ptRenderRata() {
   const shot = document.querySelector('#pt-rata-card .btn-shot');
   if (shot) shot.dataset.name = `Saldo Piutang - Saldo rata-rata akhir bulan ${tahun} - ${u.nama} - posisi ${m.stamp}`;
   $('pt-rata-sub').textContent = m.bi > 0
-    ? `Titik ${DT_BLN[m.bi]} memakai sisa hari ini${u.rata.kosong ? `. ${u.rata.kosong} bulan belum diisi di tab PIUTANG_INPUT` : ''}`
+    ? `Titik ${DT_BLN[m.bi]} memakai sisa hari ini${u.rata.kosong ? `. ${u.rata.kosong} bulan belum ada di ${m.sumberAkhir}` : ''}`
     : 'Belum ada bulan yang lewat di tahun ini.';
   if (PT.charts.rata) { PT.charts.rata.destroy(); delete PT.charts.rata; }
   const box = $('pt-rata-box');
