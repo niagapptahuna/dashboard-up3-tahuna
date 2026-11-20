@@ -319,10 +319,21 @@
     .pt-rank li { display: grid; grid-template-columns: 24px minmax(96px, 150px) minmax(60px, 1fr) 96px; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; font-size: .8rem; }
     .pt-rank .no { font-weight: 800; color: #64748b; text-align: right; font-variant-numeric: tabular-nums; }
     .pt-rank .nm { font-weight: 700; color: #0f172a; }
-    .pt-rank .bar { height: 14px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .pt-rank .bar { height: 14px; background: #eef2f6; border-radius: 4px; overflow: hidden; }
     .pt-rank .bar span { display: block; height: 100%; background: #125D72; border-radius: 4px; }
     .pt-rank .val { text-align: right; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; line-height: 1.2; }
     .pt-rank .val small { display: block; font-size: .68rem; font-weight: 600; color: #475569; }
+    /* Tingkat progres: < 85% merah, 85-95% oranye, > 95% hijau, 100% biru. Batang warna lembut,
+       angka warna tua dari rona yang sama (kontras teks >= 4.5:1, juga di baris UP3). */
+    .pt-lv-merah { --lv: #f3a0a0; --lv-t: #b91c1c; }
+    .pt-lv-oranye { --lv: #f7bc7f; --lv-t: #c2410c; }
+    .pt-lv-hijau { --lv: #8ed6aa; --lv-t: #047857; }
+    .pt-lv-biru { --lv: #93bdf3; --lv-t: #1d4ed8; }
+    .pt-rank .bar span[class^="pt-lv-"] { background: var(--lv); }
+    .pt-rank .val [class^="pt-lv-"], .dt-facts b[class^="pt-lv-"] { color: var(--lv-t); }
+    .pt-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; padding: 0; list-style: none; font-size: .7rem; font-weight: 600; color: #475569; }
+    .pt-legend li { display: inline-flex; align-items: center; gap: 5px; }
+    .pt-legend i { width: 12px; height: 8px; border-radius: 2px; background: var(--lv); }
     .pt-rank li.up3 { background: #e6f2f5; }
     /* UP3 di bawah, terpisah dari peringkat ULP (bukan bagian urutan). */
     .pt-rank-total { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1; }
@@ -2278,11 +2289,22 @@ function renderPt() {
 }
 
 /* ── Tampilan Harian ── */
+/** Kelas warna progres. Dibandingkan pada angka yang tampil (2 desimal), jadi "100,00%" selalu biru. */
+function ptLevel(x) {
+  if (x == null || !isFinite(x)) return '';
+  const v = Math.round(x * 10000) / 10000;
+  return v < 0.85 ? 'pt-lv-merah' : v <= 0.95 ? 'pt-lv-oranye' : v < 1 ? 'pt-lv-hijau' : 'pt-lv-biru';
+}
+
+const PT_LEGEND = `<ul class="pt-legend" aria-label="Arti warna progres">
+  <li><i class="pt-lv-merah"></i>&lt; 85%</li><li><i class="pt-lv-oranye"></i>85–95%</li>
+  <li><i class="pt-lv-hijau"></i>95–100%</li><li><i class="pt-lv-biru"></i>100%</li></ul>`;
+
 function ptRankRow(u) {
   const w = u.prog.rp == null ? 0 : Math.max(0, Math.min(1, u.prog.rp)) * 100;
   return `<li class="${u.up3 ? 'up3' : ''}"><span class="no">${u.up3 || u.rank == null ? '' : u.rank}</span><span class="nm">${esc(u.nama)}</span>
-    <span class="bar" aria-hidden="true"><span style="width:${w.toFixed(2)}%"></span></span>
-    <span class="val">${ptPct(u.prog.rp)}<small>${ptPct(u.prog.lbr)} lbr</small></span></li>`;
+    <span class="bar" aria-hidden="true"><span class="${ptLevel(u.prog.rp)}" style="width:${w.toFixed(2)}%"></span></span>
+    <span class="val"><span class="${ptLevel(u.prog.rp)}">${ptPct(u.prog.rp)}</span><small class="${ptLevel(u.prog.lbr)}">${ptPct(u.prog.lbr)} lbr</small></span></li>`;
 }
 
 function ptRenderHarian() {
@@ -2298,14 +2320,14 @@ function ptRenderHarian() {
   // 1. Progres per ULP, urut tertinggi; UP3 di bawah, terpisah dari peringkat.
   const urut = m.ulp.slice().sort((a, b) => (b.prog.rp ?? -1) - (a.prog.rp ?? -1));
   const facts = `<ul class="dt-facts">
-    <li><b>${ptPct(up3.prog.rp)}</b>Progres UP3 (Rp)</li>
+    <li><b class="${ptLevel(up3.prog.rp)}">${ptPct(up3.prog.rp)}</b>Progres UP3 (Rp)</li>
     <li><b>${ptRp(up3.pel.rp)}</b>Terlunasi, ${ptNum(up3.pel.lbr)} lbr</li>
     <li><b>${ptRp(up3.sisa.rp)}</b>Sisa saldo, ${ptNum(up3.sisa.lbr)} lbr</li>
     ${up3.hari ? `<li><b>${ptRp(up3.hari.rp)}</b>${esc(sejak)}, ${ptNum(up3.hari.lbr)} lbr</li>` : ''}
   </ul>`;
   const s1 = `<section class="pt-sec">
     <h6 class="pt-sec-title">Progres pelunasan per ULP</h6><div class="dt-sub">Rp terlunasi dari SOREK, urut tertinggi</div>
-    ${facts}<ul class="pt-rank" aria-label="Progres pelunasan per ULP, dari tertinggi">${urut.map(ptRankRow).join('')}</ul>
+    ${PT_LEGEND}${facts}<ul class="pt-rank" aria-label="Progres pelunasan per ULP, dari tertinggi">${urut.map(ptRankRow).join('')}</ul>
     <ul class="pt-rank pt-rank-total" aria-label="Progres pelunasan UP3">${ptRankRow(up3)}</ul></section>`;
 
   // 2. Monitoring per ULP (Excel: Monitoring Saldo Piutang Non Kogol 1 & 2)
