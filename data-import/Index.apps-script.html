@@ -405,6 +405,40 @@
     .pt-tema .pt-rank li.up3 .nm { color: var(--ti); }
     .pt-tema .pt-mini .trk span { background: var(--th); }
     .pt-tema .pt-sec-title::before { content: ''; display: inline-block; width: 4px; height: .95em; margin-right: 8px; border-radius: 2px; background: var(--th); vertical-align: -2px; }
+
+    /* Tindak lanjut pelanggan > 1 lembar: satu baris per IDPEL, status dan foto diisi langsung dari kartu. */
+    .tl-tools { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; margin: 14px 0 10px; }
+    .tl-tools .dt-field { min-width: 150px; }
+    .tl-tools .tl-cari { flex: 1 1 220px; }
+    .tl-count { font-size: .75rem; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    .tl-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid #eef2f6; }
+    .tl-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px 200px 170px; grid-template-areas: "who num st foto"; gap: 8px 16px; align-items: center; padding: 12px 4px; border-bottom: 1px solid #eef2f6; }
+    .tl-who { grid-area: who; min-width: 0; }
+    .tl-num { grid-area: num; text-align: right; font-variant-numeric: tabular-nums; }
+    .tl-st { grid-area: st; }
+    .tl-foto { grid-area: foto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .tl-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .78rem; font-weight: 700; color: var(--ti); }
+    .tl-nama { display: block; font-size: .85rem; font-weight: 700; color: #0f172a; overflow-wrap: anywhere; }
+    .tl-alamat { display: block; font-size: .72rem; font-weight: 500; color: #475569; overflow-wrap: anywhere; }
+    .tl-num b { display: block; font-size: .85rem; color: #0f172a; }
+    .tl-num span { font-size: .75rem; font-weight: 600; color: #475569; }
+    .tl-sel { font-weight: 700; min-height: 38px; }
+    .tl-sel[data-st="MENYALA"] { color: #047857; background-color: #ECFDF5; border-color: #A7F3D0; }
+    .tl-sel[data-st="PEMUTUSAN"] { color: #B45309; background-color: #FFFBEB; border-color: #FCD34D; }
+    .tl-sel[data-st="PEMBONGKARAN"] { color: #B91C1C; background-color: #FEF2F2; border-color: #FCA5A5; }
+    .tl-meta { display: block; min-height: 1.1em; margin-top: 4px; font-size: .68rem; font-weight: 600; color: #64748b; }
+    .tl-meta.err { color: #B91C1C; }
+    .tl-thumb, .tl-nofoto { position: relative; display: block; flex: none; width: 56px; height: 56px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; background: #f8fafc; }
+    .tl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .tl-nofoto { display: grid; place-items: center; color: #94a3b8; }
+    .tl-thumb.busy::after { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,.55); }
+    .tl-up { min-height: 38px; font-size: .75rem; font-weight: 700; color: var(--ti); border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; white-space: nowrap; }
+    .tl-up:hover { background: var(--ts); }
+    .tl-up:focus-visible, .tl-sel:focus-visible { outline: 3px solid var(--th); outline-offset: 2px; }
+    @media (max-width: 767.98px) {
+      .tl-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who num" "st foto"; }
+      .tl-sel, .tl-up { min-height: 44px; }
+    }
     @media (max-width: 575.98px) {
       .pt-rank li { grid-template-columns: 18px minmax(64px, 92px) minmax(30px, 1fr) 70px; gap: 8px; padding: 6px 4px; }
       .pt-stamp { margin-left: 0; }
@@ -2143,11 +2177,13 @@ const PT_TEMA = {
   rata: { g1: '#4338CA', g2: '#7C3AED', th: '#4F46E5', ts: '#EEF0FD', ti: '#4338CA', main: '#4F46E5' },
   kogol: { g1: '#0369A1', g2: '#2563EB', th: '#1D4ED8', ts: '#EAF1FE', ti: '#1D4ED8', main: '#2563EB' },
   nonkogol: { g1: '#9F1239', g2: '#DB2777', th: '#BE185D', ts: '#FDEEF4', ti: '#BE185D', main: '#DB2777' },
+  tl: { g1: '#92400E', g2: '#C2410C', th: '#B45309', ts: '#FEF3E7', ti: '#9A3412', main: '#C2410C' },
 };
 const ptGaya = (k) => { const t = PT_TEMA[k]; return `--g1:${t.g1};--g2:${t.g2};--th:${t.th};--ts:${t.ts};--ti:${t.ti}`; };
 // Grafik saldo rata-rata: realisasi warna kartunya, bulan berjalan hijau toska, target oranye seperti di halaman NPS.
 const PT_RATA_WARNA = { real: PT_TEMA.rata.main, kini: '#0F766E', target: NPS_TARGET };
-const PT = { res: null, m: null, error: '', loading: null, view: 'harian', rataUnit: '', hariUnit: '', charts: {} };
+const PT = { res: null, m: null, error: '', loading: null, view: 'harian', rataUnit: '', hariUnit: '', charts: {},
+  tl: { res: null, rows: [], byId: {}, loading: null, error: '', unit: '', st: '', q: '', target: '' } };
 
 const ptFetch = () => (typeof fetchData === 'function' ? fetchData('piutang') : gas('getPiutangData'));
 const ptNum = (n) => (n == null || !isFinite(n) ? '–' : Math.round(n).toLocaleString('id-ID'));
@@ -2339,6 +2375,7 @@ function loadPt() {
       if (!res || !res.success) throw new Error((res && res.error) || 'Gagal mengambil data saldo piutang');
       ingestPt(res);
       if (typeof writeCache === 'function') writeCache(res, PT_CACHE_KEY);
+      tlLoad();   // sesudah feed piutang, supaya posisi DB_TAGLIS sudah tercatat
     })
     .catch((err) => {
       const msg = String((err && err.message) || err);
@@ -2503,11 +2540,226 @@ function ptRenderHarian() {
         ${pilihUnit('pt-rata-unit')}</div>
       <div class="pt-chart" id="pt-rata-box"></div></section></div>`;
 
-  $('pt-v-harian').innerHTML = c1 + c5;
+  // Pelanggan lebih dari 1 lembar setelah tanggal 26: status dan foto diisi dari kartu ini (tab TINDAK_LANJUT).
+  const c7 = `<div class="chart-card mb-4 pt-tema" id="pt-tl-card" style="${ptGaya('tl')}">
+    ${ptHead('Pelanggan lebih dari 1 lembar setelah tanggal 26', 'Non Kogol 1 &amp; 2, status dan foto kondisi per IDPEL', '')}
+    <div id="pt-tl-body"></div>
+    <input type="file" id="tl-file" accept="image/*" class="visually-hidden" tabindex="-1" aria-hidden="true"></div>`;
+
+  $('pt-v-harian').innerHTML = c1 + c5 + c7;
   $('pt-rata-unit').value = PT.rataUnit || up3.kode;
   if ($('pt-hari-unit')) $('pt-hari-unit').value = PT.hariUnit || up3.kode;
   ptRenderRata();
   ptRenderHari();
+  ptRenderTl();
+}
+
+/* ── Tindak lanjut pelanggan > 1 lembar ── */
+const TL_LABEL = { MENYALA: 'Menyala', PEMUTUSAN: 'Pemutusan', PEMBONGKARAN: 'Pembongkaran' };
+const tlFetch = () => (typeof fetchData === 'function' ? fetchData('tunggakan') : gas('getTunggakanData'));
+
+/** Simpan ke Apps Script: POST teks JSON (tanpa preflight CORS) di GitHub Pages, google.script.run di web app. */
+function tlKirim(data) {
+  if (typeof fetchData === 'function') {
+    return fetch(API_URL, { method: 'POST', body: JSON.stringify(data) })
+      .then((r) => r.text())
+      .then((t) => {
+        let j;
+        try { j = JSON.parse(t); } catch (e) { throw new Error('Server tidak mengirim JSON. Pastikan Apps Script sudah di-deploy versi baru.'); }
+        if (!j.success) throw new Error(j.error || 'Gagal menyimpan.');
+        return j;
+      });
+  }
+  return new Promise((ok, no) => google.script.run
+    .withSuccessHandler((j) => (j && j.success ? ok(j) : no(new Error((j && j.error) || 'Gagal menyimpan.'))))
+    .withFailureHandler(no).simpanTindakLanjut(JSON.stringify(data)));
+}
+
+function tlLoad() {
+  const T = PT.tl;
+  if (T.loading) return T.loading;
+  T.loading = tlFetch()
+    .then((res) => {
+      if (!res || !res.success) throw new Error((res && res.error) || 'Gagal mengambil daftar pelanggan.');
+      const f = Object.fromEntries((res.fields || []).map((k, i) => [k, i]));
+      const lama = T.byId;
+      T.rows = (res.rows || []).map((r) => {
+        const o = { idpel: r[f.idpel], nama: r[f.nama], alamat: r[f.alamat], unit: r[f.unit], lembar: r[f.lembar], rp: r[f.rp],
+          status: r[f.status], foto: r[f.foto], diubah: r[f.diubah], busy: '', err: '', preview: '' };
+        const old = lama[o.idpel];
+        if (old && old.busy) Object.assign(o, { busy: old.busy, preview: old.preview });   // simpanan yang sedang berjalan
+        return o;
+      });
+      T.byId = Object.fromEntries(T.rows.map((o) => [o.idpel, o]));
+      T.res = res;
+      T.error = '';
+    })
+    .catch((err) => { T.error = String((err && err.message) || err); })
+    .finally(() => { T.loading = null; ptRenderTl(); });
+  return T.loading;
+}
+
+const tlFotoUrl = (id, w) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w}`;
+const tlFotoLink = (id) => `https://drive.google.com/file/d/${encodeURIComponent(id)}/view`;
+
+function tlMeta(o) {
+  if (o.err) return o.err;
+  if (o.busy === 'status') return 'Menyimpan status…';
+  if (o.busy === 'foto') return 'Mengunggah foto…';
+  return o.diubah ? `Diubah ${ptWaktu(o.diubah)}` : '';
+}
+
+function tlRowHtml(o) {
+  const id = esc(o.idpel);
+  const opsi = ['<option value="">Pilih status</option>']
+    .concat((PT.tl.res.statuses || Object.keys(TL_LABEL)).map((s) => `<option value="${s}"${o.status === s ? ' selected' : ''}>${TL_LABEL[s] || s}</option>`));
+  const src = o.preview || (o.foto ? tlFotoUrl(o.foto, 240) : '');
+  const foto = src
+    ? `<a class="tl-thumb${o.busy === 'foto' ? ' busy' : ''}" href="${o.foto && !o.preview ? tlFotoLink(o.foto) : '#'}"${o.foto && !o.preview ? ' target="_blank" rel="noopener"' : ' aria-disabled="true"'}>
+        <img src="${esc(src)}" alt="Foto kondisi IDPEL ${id}" loading="lazy" width="56" height="56"></a>`
+    : '<span class="tl-nofoto" aria-hidden="true"><i class="fas fa-camera"></i></span>';
+  return `<li class="tl-row" data-idpel="${id}">
+    <div class="tl-who"><span class="tl-id">${id}</span> <span class="pt-code">${esc(o.unit)}</span>
+      <span class="tl-nama">${esc(o.nama || '–')}</span><span class="tl-alamat">${esc(o.alamat || '')}</span></div>
+    <div class="tl-num"><b>${ptNum(o.lembar)} lbr</b><span>${ptNum(o.rp)}</span></div>
+    <div class="tl-st"><label class="visually-hidden" for="tl-s-${id}">Status IDPEL ${id}</label>
+      <select id="tl-s-${id}" class="form-select form-select-sm tl-sel" data-tl-status="${id}" data-st="${esc(o.status || '')}"${o.busy === 'status' ? ' aria-busy="true"' : ''}>${opsi.join('')}</select>
+      <span class="tl-meta${o.err ? ' err' : ''}" role="status">${esc(tlMeta(o))}</span></div>
+    <div class="tl-foto">${foto}
+      <button type="button" class="btn tl-up" data-tl-pilih="${id}"${o.busy === 'foto' ? ' aria-disabled="true"' : ''}>${o.foto || o.preview ? 'Ganti foto' : 'Unggah foto'}<span class="visually-hidden"> IDPEL ${id}</span></button></div>
+  </li>`;
+}
+
+function tlFacts() {
+  const T = PT.tl;
+  const box = $('tl-facts');
+  if (!box) return;
+  const tot = T.rows.reduce((a, o) => [a[0] + o.lembar, a[1] + o.rp], [0, 0]);
+  const n = (s) => T.rows.filter((o) => o.status === s).length;
+  const ada = T.rows.filter((o) => o.status).length;
+  box.innerHTML = `<li><b>${ptNum(T.rows.length)}</b>Pelanggan, ${ptNum(tot[0])} lbr</li><li><b>${ptRp(tot[1])}</b>Saldo</li>
+    <li><b>${ptNum(ada)} dari ${ptNum(T.rows.length)}</b>Sudah ada status</li>
+    <li><b>${ptNum(n('MENYALA'))} / ${ptNum(n('PEMUTUSAN'))} / ${ptNum(n('PEMBONGKARAN'))}</b>Menyala / Pemutusan / Pembongkaran</li>
+    <li><b>${ptNum(T.rows.filter((o) => o.foto).length)}</b>Sudah ada foto</li>`;
+}
+
+function tlTampil() {
+  const T = PT.tl;
+  const q = T.q.trim().toLowerCase();
+  return T.rows.filter((o) => (!T.unit || o.unit === T.unit)
+    && (!T.st || (T.st === '-' ? !o.status : o.status === T.st))
+    && (!q || o.idpel.includes(q) || String(o.nama).toLowerCase().includes(q) || String(o.alamat).toLowerCase().includes(q)));
+}
+
+function tlRenderList() {
+  const list = $('tl-list');
+  if (!list) return;
+  const rows = tlTampil();
+  $('tl-count').textContent = `Menampilkan ${ptNum(rows.length)} dari ${ptNum(PT.tl.rows.length)} pelanggan`;
+  list.innerHTML = rows.length ? rows.map(tlRowHtml).join('') : '<li class="pt-empty">Tidak ada pelanggan yang cocok dengan filter.</li>';
+}
+
+function tlRenderRow(o) {
+  const li = document.querySelector(`#tl-list .tl-row[data-idpel="${CSS.escape(o.idpel)}"]`);
+  if (!li) return;
+  const fokus = document.activeElement && li.contains(document.activeElement) ? document.activeElement.getAttribute('data-tl-status') ? 'sel' : 'btn' : '';
+  li.outerHTML = tlRowHtml(o);
+  if (fokus) {
+    const baru = document.querySelector(`#tl-list .tl-row[data-idpel="${CSS.escape(o.idpel)}"] ${fokus === 'sel' ? '.tl-sel' : '.tl-up'}`);
+    if (baru) baru.focus();
+  }
+}
+
+function ptRenderTl() {
+  const box = $('pt-tl-body');
+  if (!box) return;
+  const T = PT.tl;
+  if (!T.res) {
+    box.innerHTML = T.error
+      ? `<div class="pt-empty">${esc(T.error)} <button type="button" class="btn btn-link btn-sm p-0 align-baseline fw-bold" data-tl-retry>Coba lagi</button></div>`
+      : '<div class="pt-empty">Memuat daftar pelanggan…</div>';
+    return;
+  }
+  const r = T.res;
+  if (!r.buka) {
+    box.innerHTML = `<div class="pt-empty">Daftar dibuka tanggal ${esc(dtTgl(dtDate(r.tglBuka), true))}.${r.posisi ? ` DB_TAGLIS sekarang posisi ${esc(ptWaktu(r.posisi))}.` : ''}${r.note ? ' ' + esc(r.note) : ''}</div>`;
+    return;
+  }
+  const units = (PT.m ? PT.m.ulp : []).map((u) => `<option value="${esc(u.kode)}"${T.unit === u.kode ? ' selected' : ''}>${esc(u.nama)}</option>`).join('');
+  const sts = [['', 'Semua status'], ['-', 'Belum ada status']].concat(Object.keys(TL_LABEL).map((s) => [s, TL_LABEL[s]]))
+    .map(([v, l]) => `<option value="${v}"${T.st === v ? ' selected' : ''}>${l}</option>`).join('');
+  box.innerHTML = `${r.note ? `<div class="pt-empty">${esc(r.note)}</div>` : ''}
+    <div class="dt-sub mb-2">DB_TAGLIS posisi ${esc(ptWaktu(r.posisi))}. Status dan foto langsung tersimpan di tab TINDAK_LANJUT.</div>
+    <ul class="dt-facts" id="tl-facts"></ul>
+    <div class="tl-tools">
+      <div class="dt-field"><label for="tl-f-unit">ULP</label><select id="tl-f-unit" class="form-select form-select-sm filter-control"><option value="">Semua ULP</option>${units}</select></div>
+      <div class="dt-field"><label for="tl-f-st">Status</label><select id="tl-f-st" class="form-select form-select-sm filter-control">${sts}</select></div>
+      <div class="dt-field tl-cari"><label for="tl-q">Cari IDPEL, nama atau alamat</label><input id="tl-q" type="search" class="form-control form-control-sm filter-control" value="${esc(T.q)}" autocomplete="off"></div>
+    </div>
+    <div class="tl-count" id="tl-count" aria-live="polite"></div>
+    <ul class="tl-list" id="tl-list"></ul>`;
+  tlFacts();
+  tlRenderList();
+}
+
+async function tlSimpanStatus(sel) {
+  const o = PT.tl.byId[sel.dataset.tlStatus];
+  if (!o) return;
+  const lama = o.status;
+  o.status = sel.value; o.busy = 'status'; o.err = '';
+  tlRenderRow(o);
+  try {
+    const j = await tlKirim({ bulan: PT.tl.res.bulan, idpel: o.idpel, status: o.status });
+    o.status = j.status; o.diubah = j.diubah;
+  } catch (e) {
+    o.status = lama; o.err = 'Gagal menyimpan: ' + String((e && e.message) || e);
+  }
+  o.busy = '';
+  tlRenderRow(o);
+  tlFacts();
+}
+
+/** Foto diperkecil di browser (sisi terpanjang 1600 px, JPEG) supaya cepat terkirim dari HP. */
+function tlKecilkan(file, maks = 1600) {
+  return new Promise((ok, no) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, maks / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * k));
+      c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      ok(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); no(new Error('File bukan gambar yang bisa dibaca.')); };
+    img.src = url;
+  });
+}
+
+async function tlUnggah(file) {
+  const o = PT.tl.byId[PT.tl.target];
+  if (!o || !file) return;
+  o.err = '';
+  try {
+    o.preview = await tlKecilkan(file);
+  } catch (e) {
+    o.err = String(e.message || e);
+    tlRenderRow(o);
+    return;
+  }
+  o.busy = 'foto';
+  tlRenderRow(o);
+  try {
+    const j = await tlKirim({ bulan: PT.tl.res.bulan, idpel: o.idpel, foto: { mime: 'image/jpeg', data: o.preview.split(',')[1] } });
+    o.foto = j.foto; o.diubah = j.diubah;
+  } catch (e) {
+    o.err = 'Foto gagal diunggah: ' + String((e && e.message) || e);
+  }
+  o.busy = ''; o.preview = '';
+  tlRenderRow(o);
+  tlFacts();
 }
 
 function ptRenderRata() {
@@ -2686,9 +2938,24 @@ function ptInit() {
   $('page-piutang').addEventListener('change', (e) => {
     if (e.target.id === 'pt-rata-unit') { PT.rataUnit = e.target.value; ptRenderRata(); }
     if (e.target.id === 'pt-hari-unit') { PT.hariUnit = e.target.value; ptRenderHari(); }
+    if (e.target.id === 'tl-f-unit') { PT.tl.unit = e.target.value; tlRenderList(); }
+    if (e.target.id === 'tl-f-st') { PT.tl.st = e.target.value; tlRenderList(); }
+    if (e.target.matches('[data-tl-status]')) tlSimpanStatus(e.target);
+    if (e.target.id === 'tl-file') { const f = e.target.files && e.target.files[0]; e.target.value = ''; tlUnggah(f); }
+  });
+  let tlCari = null;
+  $('page-piutang').addEventListener('input', (e) => {
+    if (e.target.id !== 'tl-q') return;
+    clearTimeout(tlCari);
+    tlCari = setTimeout(() => { PT.tl.q = e.target.value; tlRenderList(); }, 200);
   });
   $('page-piutang').addEventListener('click', (e) => {
     if (e.target.closest('[data-pt-retry]')) { PT.error = ''; renderPt(); loadPt(); }
+    if (e.target.closest('[data-tl-retry]')) { PT.tl.error = ''; ptRenderTl(); tlLoad(); }
+    const pilih = e.target.closest('[data-tl-pilih]');
+    if (pilih && !PT.tl.byId[pilih.dataset.tlPilih].busy) { PT.tl.target = pilih.dataset.tlPilih; $('tl-file').click(); }
+    const kosong = e.target.closest('.tl-thumb[aria-disabled="true"]');
+    if (kosong) e.preventDefault();
   });
   const refresh = $('btn-refresh');
   if (refresh) refresh.addEventListener('click', () => { if (PT.res || S.page === 'piutang') loadPt(); });
