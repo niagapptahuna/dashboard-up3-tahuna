@@ -2559,6 +2559,7 @@ function ptRenderRata() {
   const labels = DT_BLN.slice(0, n + 1);
   const real = u.rata.seri.concat([null]);
   const sementara = labels.map((_, i) => (i === n - 1 ? u.rata.seri[n - 1] : i === n ? u.rata.sementara : null));
+  const naik = u.rata.sementara != null && u.rata.seri[n - 1] != null && u.rata.sementara > u.rata.seri[n - 1];
   const W = PT_RATA_WARNA;
   const ds = [
     { label: 'Realisasi', data: real, borderColor: W.real, backgroundColor: W.real, borderWidth: 2.5, pointRadius: 3, tension: 0.25, order: 1 },
@@ -2581,7 +2582,8 @@ function ptRenderRata() {
           callbacks: { title: (it) => `${DT_BLN_PANJANG[it[0].dataIndex]} ${tahun}`, label: (c) => ` ${c.dataset.label}: ${rupiah(c.parsed.y)}` } },
         datalabels: {
           display: (c) => (c.datasetIndex === 0 && c.dataIndex === n - 1) || (c.datasetIndex === 1 && c.dataIndex === n),
-          align: 'top', anchor: 'end', color: (c) => (c.datasetIndex === 1 ? W.kini : W.real), font: { size: 10, weight: 'bold' }, formatter: (x) => npsNum(x),
+          // Label bulan terakhir di sisi yang tidak dilewati garis putus-putus ke bulan berjalan.
+          align: (c) => (c.datasetIndex === 0 && naik ? 'bottom' : 'top'), anchor: 'end', color: (c) => (c.datasetIndex === 1 ? W.kini : W.real), font: { size: 10, weight: 'bold' }, formatter: (x) => npsNum(x),
         },
       },
       scales: {
