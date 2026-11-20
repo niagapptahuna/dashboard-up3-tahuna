@@ -349,12 +349,12 @@
     .pt-rank .bar span { display: block; height: 100%; background: #125D72; border-radius: 4px; }
     .pt-rank .val { text-align: right; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; line-height: 1.2; }
     .pt-rank .val small { display: block; font-size: .68rem; font-weight: 600; color: #475569; }
-    /* Tingkat progres: < 85% merah, 85-95% oranye, > 95% hijau, 100% biru. Batang warna lembut,
-       angka warna tua dari rona yang sama (kontras teks >= 4.5:1, juga di baris UP3). */
-    .pt-lv-merah { --lv: #f3a0a0; --lv-t: #b91c1c; }
-    .pt-lv-oranye { --lv: #f7bc7f; --lv-t: #c2410c; }
-    .pt-lv-hijau { --lv: #8ed6aa; --lv-t: #047857; }
-    .pt-lv-biru { --lv: #93bdf3; --lv-t: #1d4ed8; }
+    /* Tingkat progres: < 85% merah, 85-95% oranye, > 95% hijau, 100% biru. Batang memakai warna grafik halaman NPS
+       (NPS_BAD, NPS_TARGET, NPS_GOOD, BLUE); angka warna tua dari rona yang sama (kontras teks >= 4.5:1, juga di baris UP3). */
+    .pt-lv-merah { --lv: #EF4444; --lv-t: #b91c1c; }
+    .pt-lv-oranye { --lv: #F59E0B; --lv-t: #c2410c; }
+    .pt-lv-hijau { --lv: #10B981; --lv-t: #047857; }
+    .pt-lv-biru { --lv: #00A3E1; --lv-t: #1d4ed8; }
     .pt-rank .bar span[class^="pt-lv-"] { background: var(--lv); }
     .pt-rank .val [class^="pt-lv-"], .dt-facts b[class^="pt-lv-"] { color: var(--lv-t); }
     .pt-rank li.up3 { background: #e6f2f5; }
