@@ -2292,9 +2292,10 @@ function ptModel(res) {
   if (lewat.unitLain) warn.push(`${ptNum(lewat.unitLain)} baris DB_TAGLIS dengan UNITUP di luar UP3 Tahuna tidak dihitung.`);
   if (lewat.kogolLain) warn.push(`${ptNum(lewat.kogolLain)} baris DB_TAGLIS dengan KOGOL kosong atau di luar 0 s.d. 4 tidak dihitung.`);
 
-  // Pelunasan harian (tab REKAP_PELUNASAN): hanya tanggal di bulan SOREK.
+  // Pelunasan harian (tab REKAP_PELUNASAN): bulan diambil dari TGLBUKU (YYYYMMDD) yang ditempel, bukan dari SOREK,
+  // jadi Rekap bulan lain langsung terbaca. Bila Rekap memuat dua bulan, yang dipakai bulan terakhir.
   const P = res.pelunasan || { tanggal: [], unit: {}, catatan: 'Perbarui Apps Script (deploy versi baru) untuk menampilkan pelunasan harian.' };
-  const blnRekap = bulan || (P.tanggal.length ? P.tanggal[P.tanggal.length - 1].slice(0, 7) : '');
+  const blnRekap = P.tanggal.length ? P.tanggal[P.tanggal.length - 1].slice(0, 7) : bulan;
   const iRekap = P.tanggal.map((t, i) => (t.slice(0, 7) === blnRekap ? i : -1)).filter((i) => i >= 0);
   const rekap = { bulan: blnRekap, tanggal: iRekap.map((i) => P.tanggal[i]), unit: {}, catatan: P.catatan || '' };
   Object.keys(P.unit || {}).forEach((k) => { rekap.unit[k] = iRekap.map((i) => P.unit[k][i]); });
@@ -2615,24 +2616,36 @@ function ptRenderHari() {
   $('pt-hari-facts').innerHTML = `<li><b>${ptRp(tot[1])}</b>Terlunasi, ${ptNum(tot[0])} lbr</li>
     <li><b>${ptRp(tot[1] / seri.length)}</b>Rata-rata per hari (${seri.length} hari)</li>
     <li><b>${ptRp(seri[iMax][1])}</b>Tertinggi, ${dtTgl(dtDate(r.tanggal[iMax]))}</li>`;
-  const hari = (t) => `${DT_HARI_PANJANG[dtDow(dtDate(t))]}, ${dtTgl(dtDate(t), true)}`;
+
+  // Sumbu tanggal 1 s.d. akhir bulan. Tanggal yang tidak ada di Rekap: 0 bila sebelum TGLBUKU terakhir,
+  // kosong (belum ada data) bila sesudahnya.
+  const awal = dtDate(r.bulan + '-01');
+  const nHari = new Date(Date.UTC(awal.getUTCFullYear(), awal.getUTCMonth() + 1, 0)).getUTCDate();
+  const akhir = dtDate(r.tanggal[r.tanggal.length - 1]).getUTCDate();
+  const perHari = {};
+  r.tanggal.forEach((t, i) => { perHari[dtDate(t).getUTCDate()] = seri[i]; });
+  const hariKe = Array.from({ length: nHari }, (_, i) => i + 1);
+  const isi = hariKe.map((d) => perHari[d] || (d <= akhir ? [0, 0] : null));
+  const tgl = (d) => new Date(Date.UTC(awal.getUTCFullYear(), awal.getUTCMonth(), d));
+  const hari = (d) => `${DT_HARI_PANJANG[dtDow(tgl(d))]}, ${dtTgl(tgl(d), true)}`;
   box.className = 'pt-chart';
-  box.innerHTML = `<canvas id="pt-chart-hari" role="img" aria-label="${esc(`Pelunasan harian ${u.nama}: ` + r.tanggal.map((t, i) => `${dtTgl(dtDate(t))} ${ptRp(seri[i][1])}`).join(', '))}"></canvas>`;
+  box.innerHTML = `<canvas id="pt-chart-hari" role="img" aria-label="${esc(`Pelunasan harian ${u.nama}, ${ptBulan(r.bulan)}: `
+    + hariKe.filter((d) => isi[d - 1]).map((d) => `${d} ${ptRp(isi[d - 1][1])}`).join(', '))}"></canvas>`;
   if (!window.Chart) return;
   Chart.defaults.font.family = "'Poppins', sans-serif";
   Chart.defaults.color = '#64748b';
   PT.charts.hari = new Chart($('pt-chart-hari'), {
     type: 'bar',
     data: {
-      labels: r.tanggal.map((t) => String(dtDate(t).getUTCDate())),
-      datasets: [{ label: 'Pelunasan RPPTL', data: seri.map((x) => x[1]), backgroundColor: NAVY, borderRadius: 4, maxBarThickness: 28 }],
+      labels: hariKe.map(String),
+      datasets: [{ label: 'Pelunasan RPPTL', data: isi.map((x) => (x ? x[1] : null)), backgroundColor: NAVY, borderRadius: 4, maxBarThickness: 28 }],
     },
     options: {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 8 } },
       plugins: {
         legend: { display: false },
         datalabels: { display: false },
-        tooltip: { callbacks: { title: (it) => hari(r.tanggal[it[0].dataIndex]), label: (c) => ` ${rupiah(c.parsed.y)}, ${ptNum(seri[c.dataIndex][0])} lbr` } },
+        tooltip: { callbacks: { title: (it) => hari(it[0].dataIndex + 1), label: (c) => ` ${rupiah(c.parsed.y)}, ${ptNum(isi[c.dataIndex][0])} lbr` } },
       },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' }, maxRotation: 0, autoSkip: true } },
