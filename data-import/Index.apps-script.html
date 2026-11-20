@@ -2685,13 +2685,10 @@ function ptRenderTl() {
     box.innerHTML = `<div class="pt-empty">${esc(r.note || 'Daftar pelanggan belum tersedia.')}</div>`;
     return;
   }
-  const sementara = r.tglBatas && String(r.posisi).slice(0, 10) < r.tglBatas
-    ? `, daftar sementara sampai ${esc(dtTgl(dtDate(r.tglBatas), true))}` : '';
   const units = (PT.m ? PT.m.ulp : []).map((u) => `<option value="${esc(u.kode)}"${T.unit === u.kode ? ' selected' : ''}>${esc(u.nama)}</option>`).join('');
   const sts = [['', 'Semua status'], ['-', 'Belum ada status']].concat(Object.keys(TL_LABEL).map((s) => [s, TL_LABEL[s]]))
     .map(([v, l]) => `<option value="${v}"${T.st === v ? ' selected' : ''}>${l}</option>`).join('');
   box.innerHTML = `${r.note ? `<div class="pt-empty">${esc(r.note)}</div>` : ''}
-    <div class="dt-sub mb-2">DB_TAGLIS posisi ${esc(ptWaktu(r.posisi))}${sementara}. Status dan foto langsung tersimpan di tab TINDAK_LANJUT.</div>
     <ul class="dt-facts" id="tl-facts"></ul>
     <div class="tl-tools">
       <div class="dt-field"><label for="tl-f-unit">ULP</label><select id="tl-f-unit" class="form-select form-select-sm filter-control"><option value="">Semua ULP</option>${units}</select></div>
