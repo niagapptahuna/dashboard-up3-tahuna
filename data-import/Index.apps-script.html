@@ -2135,28 +2135,19 @@ function dtInit() {
 /* ═══════════════════ SALDO PIUTANG (DB TAGLIS) ═══════════════════ */
 const PT_CACHE_KEY = 'dpp-piutang-v1';
 const PT_SISA = [0, 3, 4];          // "Non Kogol 1 & 2": kogol yang dihitung di monitoring harian
-const PT_EX1 = [0, 2, 3, 4];        // "tanpa Kogol 1" di saldo piutang lancar
-const PT_SEMUA = [0, 1, 2, 3, 4];
 const PT_LEMBAR = ['1 lembar', '2 lembar', '>2 lembar'];
 // Satu tema warna per kartu, dari keluarga warna kartu KPI halaman NPS. Ujung gradasi digelapkan seperlunya supaya
 // teks putih di pita judul tetap >= 4.5:1. th = kepala tabel, ts/ti = latar dan teks baris UP3, main = warna grafik.
 const PT_TEMA = {
   harian: { g1: '#2C3E50', g2: '#4B6CB7', th: '#3D5A99', ts: '#E9EEF8', ti: '#2C4A86', main: '#4B6CB7' },
   rata: { g1: '#4338CA', g2: '#7C3AED', th: '#4F46E5', ts: '#EEF0FD', ti: '#4338CA', main: '#4F46E5' },
-  lancar: { g1: '#047857', g2: '#0369A1', th: '#047857', ts: '#E6F4EF', ti: '#047857', main: '#059669' },
   kogol: { g1: '#0369A1', g2: '#2563EB', th: '#1D4ED8', ts: '#EAF1FE', ti: '#1D4ED8', main: '#2563EB' },
   nonkogol: { g1: '#9F1239', g2: '#DB2777', th: '#BE185D', ts: '#FDEEF4', ti: '#BE185D', main: '#DB2777' },
 };
 const ptGaya = (k) => { const t = PT_TEMA[k]; return `--g1:${t.g1};--g2:${t.g2};--th:${t.th};--ts:${t.ts};--ti:${t.ti}`; };
 // Grafik saldo rata-rata: realisasi warna kartunya, bulan berjalan hijau toska, target oranye seperti di halaman NPS.
 const PT_RATA_WARNA = { real: PT_TEMA.rata.main, kini: '#0F766E', target: NPS_TARGET };
-const PT_LANCAR = [
-  { key: 'saldo', name: 'Saldo' },
-  { key: 'sorek', name: 'SOREK' },
-  { key: 'pel', name: 'Pelunasan' },
-  { key: 'pct', name: '% saldo' },
-];
-const PT = { res: null, m: null, error: '', loading: null, view: 'harian', lancar: 'saldo', rataUnit: '', hariUnit: '', charts: {} };
+const PT = { res: null, m: null, error: '', loading: null, view: 'harian', rataUnit: '', hariUnit: '', charts: {} };
 
 const ptFetch = () => (typeof fetchData === 'function' ? fetchData('piutang') : gas('getPiutangData'));
 const ptNum = (n) => (n == null || !isFinite(n) ? '–' : Math.round(n).toLocaleString('id-ID'));
@@ -2227,7 +2218,6 @@ function ptModel(res) {
     const v = dariLog(log.entri.filter((x) => x[0].slice(0, 7) === ym).pop(), k);
     return v ? v[1] : null;
   };
-  const jumlah = (arr, idx) => (idx.some((g) => arr[g] == null) ? null : idx.reduce((a, g) => a + arr[g], 0));
   const kurang = (a, b) => (a == null ? null : a - b);
   const bagi = (a, b) => (a == null || !b ? null : a / b);
 
@@ -2243,19 +2233,6 @@ function ptModel(res) {
     u.prog = { lbr: bagi(u.pel.lbr, u.sorek.lbr), rp: bagi(u.pel.rp, u.sorek.rp) };
     const p = dariLog(lalu, k);
     u.hari = p ? { lbr: p[0] - u.sisa.lbr, rp: p[1] - u.sisa.rp } : null;
-
-    // Saldo piutang lancar: RPPTL saja, per kogol; rekening kembali = saldo / SOREK tanpa Kogol 1.
-    const sorekK = PT_SEMUA.map((g) => pilih(k, (x) => ambil('sorek', x, (o) => (o.kogol ? o.kogol[g] : null))));
-    const saldoK = s.map((a) => a[1]);
-    u.lancar = { sorek: sorekK, saldo: saldoK };
-    ['Ex1', 'All'].forEach((t) => {
-      const idx = t === 'Ex1' ? PT_EX1 : PT_SEMUA;
-      u.lancar['sorek' + t] = jumlah(sorekK, idx);
-      u.lancar['saldo' + t] = jumlah(saldoK, idx);
-    });
-    const tRek = ambil('target', k, (o) => o.rekKembali);
-    const rReal = bagi(u.lancar.saldoEx1, u.lancar.sorekEx1);
-    u.rek = { target: tRek, real: rReal, capai: tRek && rReal != null ? 2 - rReal / tRek : null };
 
     // Saldo rata-rata akhir bulan: rata-rata saldo akhir bulan-bulan yang sudah lewat.
     const hist = [];
@@ -2516,52 +2493,11 @@ function ptRenderHarian() {
         ${pilihUnit('pt-rata-unit')}</div>
       <div class="pt-chart" id="pt-rata-box"></div></section></div>`;
 
-  // Saldo piutang lancar per kogol (Excel: Pencapaian Saldo Piutang Lancar), kartu sendiri
-  const c6 = `<div class="chart-card mb-4 pt-tema" id="pt-lancar-card" style="${ptGaya('lancar')}">
-    ${ptHead(`<span id="pt-lancar-title"></span>`, `RPPTL per ULP, SOREK ${esc(bln)}, posisi ${esc(m.stamp)}`,
-      'Saldo Piutang - Saldo piutang lancar',
-      `<div class="dt-field no-capture"><span class="dt-lbl" id="pt-lancar-lbl">Tampilkan</span>
-        <div class="btn-group seg-toggle" role="radiogroup" aria-labelledby="pt-lancar-lbl">${PT_LANCAR.map((x) => `<input type="radio" class="btn-check" name="pt-lancar" id="pt-lancar-${x.key}" value="${x.key}"${x.key === PT.lancar ? ' checked' : ''}>
-          <label class="btn" for="pt-lancar-${x.key}">${esc(x.name)}</label>`).join('')}</div></div>`)}
-    <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat semua kolom.</div>
-    <div class="pt-wrap" tabindex="0" aria-label="Tabel saldo piutang lancar, dapat digeser" id="pt-lancar-body"></div></div>`;
-
-  $('pt-v-harian').innerHTML = c1 + c5 + c6;
+  $('pt-v-harian').innerHTML = c1 + c5;
   $('pt-rata-unit').value = PT.rataUnit || up3.kode;
   if ($('pt-hari-unit')) $('pt-hari-unit').value = PT.hariUnit || up3.kode;
-  ptRenderLancar();
   ptRenderRata();
   ptRenderHari();
-}
-
-function ptRenderLancar() {
-  const m = PT.m;
-  const key = PT.lancar;
-  const nama = PT_LANCAR.find((x) => x.key === key).name;
-  const pct = key === 'pct';
-  $('pt-lancar-title').textContent = `Saldo piutang lancar per kogol: ${nama}`;
-  const shot = document.querySelector('#pt-lancar-card .btn-shot');
-  if (shot) shot.dataset.name = `Saldo Piutang - Saldo piutang lancar ${nama.replace('%', 'persen')} - posisi ${m.stamp}`;
-  const nilai = (u, g) => {
-    const so = g === 'ex1' ? u.lancar.sorekEx1 : g === 'all' ? u.lancar.sorekAll : u.lancar.sorek[g];
-    const sa = g === 'ex1' ? u.lancar.saldoEx1 : g === 'all' ? u.lancar.saldoAll : u.lancar.saldo[g];
-    if (key === 'sorek') return so;
-    if (key === 'saldo') return sa;
-    if (key === 'pel') return so == null ? null : so - sa;
-    return so ? sa / so : null;
-  };
-  const sel = (u, g, cls) => (pct ? ptTdPct(nilai(u, g), cls) : ptTd(nilai(u, g), cls));
-  const baris = (u) => PT_SEMUA.map((g) => sel(u, g, g === 0 ? 's' : '')).join('')
-    + sel(u, 'ex1', 's b') + sel(u, 'all', 'b')
-    + `${ptTdPct(u.rek.target, 's')}${ptTdPct(u.rek.real)}<td>${ptPill(u.rek.capai)}</td>`;
-  $('pt-lancar-body').innerHTML = `<table class="pt-table">
-    <thead><tr><th rowspan="2" class="pt-unit" scope="col">Unit</th><th colspan="5" class="s" scope="colgroup">${esc(nama)} per kogol</th>
-      <th rowspan="2" class="s" scope="col">Total tanpa<br>Kogol 1</th><th rowspan="2" scope="col">Total</th>
-      <th colspan="3" class="s" scope="colgroup">Rekening kembali</th></tr>
-      <tr>${PT_SEMUA.map((g) => `<th scope="col"${g === 0 ? ' class="s"' : ''}>Kogol ${g}</th>`).join('')}
-      <th scope="col" class="s">Target</th><th scope="col">Realisasi</th><th scope="col">Pencapaian</th></tr></thead>
-    <tbody>${m.ulp.map((u) => `<tr>${ptUnitTh(u)}${baris(u)}</tr>`).join('')}</tbody>
-    <tfoot><tr>${ptUnitTh(m.up3)}${baris(m.up3)}</tr></tfoot></table>`;
 }
 
 function ptRenderRata() {
@@ -2738,7 +2674,6 @@ function ptRenderNonKogol() {
 function ptInit() {
   document.querySelectorAll('input[name="pt-view"]').forEach((el) => el.addEventListener('change', () => { PT.view = el.value; renderPt(); }));
   $('page-piutang').addEventListener('change', (e) => {
-    if (e.target.name === 'pt-lancar') { PT.lancar = e.target.value; ptRenderLancar(); }
     if (e.target.id === 'pt-rata-unit') { PT.rataUnit = e.target.value; ptRenderRata(); }
     if (e.target.id === 'pt-hari-unit') { PT.hariUnit = e.target.value; ptRenderHari(); }
   });
