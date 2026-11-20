@@ -2206,6 +2206,8 @@ const PT_SISA = [0, 3, 4];          // "Non Kogol 1 & 2": kogol yang dihitung di
 const PT_EX1 = [0, 2, 3, 4];        // "tanpa Kogol 1" di saldo piutang lancar
 const PT_SEMUA = [0, 1, 2, 3, 4];
 const PT_LEMBAR = ['1 lembar', '2 lembar', '>2 lembar'];
+// Grafik saldo rata-rata: satu warna per kategori. Target oranye sama dengan garis target di halaman NPS.
+const PT_RATA_WARNA = { real: NAVY, kini: '#7C3AED', target: NPS_TARGET };
 const PT_LANCAR = [
   { key: 'saldo', name: 'Saldo' },
   { key: 'sorek', name: 'SOREK' },
@@ -2549,25 +2551,27 @@ function ptRenderHarian() {
       <tbody>${m.ulp.map((u) => `<tr>${ptUnitTh(u)}${baris4(u)}</tr>`).join('')}</tbody>
       <tfoot><tr>${ptUnitTh(up3)}${baris4(up3)}</tr></tfoot></table></div></section>`;
 
-  // 5. Saldo rata-rata akhir bulan terhadap target
+  // Bagian 1 s.d. 4 dalam satu kartu dengan satu tombol unduh gambar.
+  const c1 = `<div class="chart-card mb-4" id="pt-harian-card">
+    ${ptHead(`Saldo piutang Non Kogol 1 &amp; 2, SOREK ${esc(bln)}`, `Kogol 0, 3 dan 4 per ULP, posisi ${esc(m.stamp)}`,
+      `Saldo Piutang - Harian ${bln} - posisi ${m.stamp}`)}
+    ${s1}${s2}${s3}${s4}</div>`;
+
+  // Saldo rata-rata akhir bulan terhadap target: tabel dan grafik per unit, kartu sendiri dengan tombol unduh sendiri.
   const lewat = m.bi > 0 ? `${DT_BLN[0]} s.d. ${DT_BLN[m.bi - 1]}` : '';
   const baris5 = (u) => `${ptTd(u.rata.target, 's')}${ptTd(u.rata.real)}<td>${ptPill(u.rata.capai)}</td>`;
-  const s5 = `<section class="pt-sec">
-    <h6 class="pt-sec-title">Saldo rata-rata akhir bulan terhadap target</h6>${hint}
-    <div class="pt-wrap mb-3" tabindex="0" aria-label="Tabel saldo rata-rata akhir bulan, dapat digeser"><table class="pt-table">
+  const c5 = `<div class="chart-card mb-4" id="pt-rata-card">
+    ${ptHead('Saldo rata-rata akhir bulan terhadap target', `Per ULP, posisi ${esc(m.stamp)}`, 'Saldo Piutang - Saldo rata-rata akhir bulan')}
+    ${hint}
+    <div class="pt-wrap" tabindex="0" aria-label="Tabel saldo rata-rata akhir bulan, dapat digeser"><table class="pt-table">
       <thead><tr><th class="pt-unit" scope="col">Unit</th><th scope="col" class="s">Target</th>
         <th scope="col">Realisasi${lewat ? ' (' + esc(lewat) + ')' : ''}</th><th scope="col">Pencapaian</th></tr></thead>
       <tbody>${m.ulp.map((u) => `<tr>${ptUnitTh(u)}${baris5(u)}</tr>`).join('')}</tbody>
       <tfoot><tr>${ptUnitTh(up3)}${baris5(up3)}</tr></tfoot></table></div>
-    <div class="pt-head"><div><h6 class="pt-chart-title" id="pt-rata-title"></h6><div class="dt-sub" id="pt-rata-sub"></div></div>
-      ${pilihUnit('pt-rata-unit')}</div>
-    <div class="pt-chart" id="pt-rata-box"></div></section>`;
-
-  // Bagian 1 s.d. 5 dalam satu kartu dengan satu tombol unduh gambar.
-  const c1 = `<div class="chart-card mb-4" id="pt-harian-card">
-    ${ptHead(`Saldo piutang Non Kogol 1 &amp; 2, SOREK ${esc(bln)}`, `Kogol 0, 3 dan 4 per ULP, posisi ${esc(m.stamp)}`,
-      `Saldo Piutang - Harian ${bln} - posisi ${m.stamp}`)}
-    ${s1}${s2}${s3}${s4}${s5}</div>`;
+    <section class="pt-sec">
+      <div class="pt-head"><div><h6 class="pt-sec-title" id="pt-rata-title"></h6><div class="dt-sub" id="pt-rata-sub"></div></div>
+        ${pilihUnit('pt-rata-unit')}</div>
+      <div class="pt-chart" id="pt-rata-box"></div></section></div>`;
 
   // Saldo piutang lancar per kogol (Excel: Pencapaian Saldo Piutang Lancar), kartu sendiri
   const c6 = `<div class="chart-card mb-4" id="pt-lancar-card">
@@ -2579,7 +2583,7 @@ function ptRenderHarian() {
     <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat semua kolom.</div>
     <div class="pt-wrap" tabindex="0" aria-label="Tabel saldo piutang lancar, dapat digeser" id="pt-lancar-body"></div></div>`;
 
-  $('pt-v-harian').innerHTML = c1 + c6;
+  $('pt-v-harian').innerHTML = c1 + c5 + c6;
   $('pt-rata-unit').value = PT.rataUnit || up3.kode;
   if ($('pt-hari-unit')) $('pt-hari-unit').value = PT.hariUnit || up3.kode;
   ptRenderLancar();
@@ -2622,6 +2626,8 @@ function ptRenderRata() {
   const u = m.units.find((x) => x.kode === (PT.rataUnit || m.up3.kode)) || m.up3;
   const tahun = m.bulan ? m.bulan.slice(0, 4) : '';
   $('pt-rata-title').textContent = `Saldo rata-rata akhir bulan ${tahun}, ${u.nama}`;
+  const shot = document.querySelector('#pt-rata-card .btn-shot');
+  if (shot) shot.dataset.name = `Saldo Piutang - Saldo rata-rata akhir bulan ${tahun} - ${u.nama} - posisi ${m.stamp}`;
   $('pt-rata-sub').textContent = m.bi > 0
     ? `Titik ${DT_BLN[m.bi]} memakai sisa hari ini${u.rata.kosong ? `. ${u.rata.kosong} bulan belum diisi di tab PIUTANG_INPUT` : ''}`
     : 'Belum ada bulan yang lewat di tahun ini.';
@@ -2634,12 +2640,13 @@ function ptRenderRata() {
   const labels = DT_BLN.slice(0, n + 1);
   const real = u.rata.seri.concat([null]);
   const sementara = labels.map((_, i) => (i === n - 1 ? u.rata.seri[n - 1] : i === n ? u.rata.sementara : null));
+  const W = PT_RATA_WARNA;
   const ds = [
-    { label: 'Realisasi', data: real, borderColor: NAVY, backgroundColor: NAVY, borderWidth: 2.5, pointRadius: 3, tension: 0.25, order: 1 },
-    { label: `${DT_BLN[n]} (sisa hari ini)`, data: sementara, borderColor: NAVY, backgroundColor: '#fff', borderDash: [5, 4], borderWidth: 2,
+    { label: 'Realisasi', data: real, borderColor: W.real, backgroundColor: W.real, borderWidth: 2.5, pointRadius: 3, tension: 0.25, order: 1 },
+    { label: `${DT_BLN[n]} (sisa hari ini)`, data: sementara, borderColor: W.kini, backgroundColor: '#fff', borderDash: [5, 4], borderWidth: 2,
       pointRadius: (c) => (c.dataIndex === n ? 5 : 0), pointBorderWidth: 2, spanGaps: false, order: 1 },
   ];
-  if (u.rata.target != null) ds.push({ label: 'Target', data: labels.map(() => u.rata.target), borderColor: NPS_TARGET, backgroundColor: NPS_TARGET, borderDash: [6, 4], borderWidth: 2, pointRadius: 0, order: 2 });
+  if (u.rata.target != null) ds.push({ label: 'Target', data: labels.map(() => u.rata.target), borderColor: W.target, backgroundColor: W.target, borderDash: [6, 4], borderWidth: 2, pointRadius: 0, order: 2 });
   Chart.defaults.font.family = "'Poppins', sans-serif";
   Chart.defaults.color = '#64748b';
   PT.charts.rata = new Chart($('pt-chart-rata'), {
@@ -2655,7 +2662,7 @@ function ptRenderRata() {
           callbacks: { title: (it) => `${DT_BLN_PANJANG[it[0].dataIndex]} ${tahun}`, label: (c) => ` ${c.dataset.label}: ${rupiah(c.parsed.y)}` } },
         datalabels: {
           display: (c) => (c.datasetIndex === 0 && c.dataIndex === n - 1) || (c.datasetIndex === 1 && c.dataIndex === n),
-          align: 'top', anchor: 'end', color: NAVY, font: { size: 10, weight: 'bold' }, formatter: (x) => npsNum(x),
+          align: 'top', anchor: 'end', color: (c) => (c.datasetIndex === 1 ? W.kini : W.real), font: { size: 10, weight: 'bold' }, formatter: (x) => npsNum(x),
         },
       },
       scales: {
