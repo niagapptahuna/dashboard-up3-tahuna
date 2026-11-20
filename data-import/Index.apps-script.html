@@ -2183,7 +2183,7 @@ const ptGaya = (k) => { const t = PT_TEMA[k]; return `--g1:${t.g1};--g2:${t.g2};
 // Grafik saldo rata-rata: realisasi warna kartunya, bulan berjalan hijau toska, target oranye seperti di halaman NPS.
 const PT_RATA_WARNA = { real: PT_TEMA.rata.main, kini: '#0F766E', target: NPS_TARGET };
 const PT = { res: null, m: null, error: '', loading: null, view: 'harian', rataUnit: '', hariUnit: '', charts: {},
-  tl: { res: null, rows: [], byId: {}, loading: null, error: '', unit: '', st: '', q: '', target: '' } };
+  tl: { res: null, rows: [], byId: {}, loading: null, error: '', unit: '', st: '', lbr: '', q: '', target: '' } };
 
 const ptFetch = () => (typeof fetchData === 'function' ? fetchData('piutang') : gas('getPiutangData'));
 const ptNum = (n) => (n == null || !isFinite(n) ? '–' : Math.round(n).toLocaleString('id-ID'));
@@ -2648,6 +2648,7 @@ function tlTampil() {
   const q = T.q.trim().toLowerCase();
   return T.rows.filter((o) => (!T.unit || o.unit === T.unit)
     && (!T.st || (T.st === '-' ? !o.status : o.status === T.st))
+    && (!T.lbr || String(o.lembar) === T.lbr)
     && (!q || o.idpel.includes(q) || String(o.nama).toLowerCase().includes(q) || String(o.alamat).toLowerCase().includes(q)));
 }
 
@@ -2688,11 +2689,14 @@ function ptRenderTl() {
   const units = (PT.m ? PT.m.ulp : []).map((u) => `<option value="${esc(u.kode)}"${T.unit === u.kode ? ' selected' : ''}>${esc(u.nama)}</option>`).join('');
   const sts = [['', 'Semua status'], ['-', 'Belum ada status']].concat(Object.keys(TL_LABEL).map((s) => [s, TL_LABEL[s]]))
     .map(([v, l]) => `<option value="${v}"${T.st === v ? ' selected' : ''}>${l}</option>`).join('');
+  const lbrAda = [...new Set(T.rows.map((o) => o.lembar).concat(T.lbr ? [Number(T.lbr)] : []))].sort((a, b) => a - b);
+  const lbrs = lbrAda.map((n) => `<option value="${n}"${T.lbr === String(n) ? ' selected' : ''}>${ptNum(n)} lembar</option>`).join('');
   box.innerHTML = `${r.note ? `<div class="pt-empty">${esc(r.note)}</div>` : ''}
     <ul class="dt-facts" id="tl-facts"></ul>
     <div class="tl-tools">
       <div class="dt-field"><label for="tl-f-unit">ULP</label><select id="tl-f-unit" class="form-select form-select-sm filter-control"><option value="">Semua ULP</option>${units}</select></div>
       <div class="dt-field"><label for="tl-f-st">Status</label><select id="tl-f-st" class="form-select form-select-sm filter-control">${sts}</select></div>
+      <div class="dt-field"><label for="tl-f-lbr">Jumlah lembar</label><select id="tl-f-lbr" class="form-select form-select-sm filter-control"><option value="">Semua lembar</option>${lbrs}</select></div>
       <div class="dt-field tl-cari"><label for="tl-q">Cari IDPEL, nama atau alamat</label><input id="tl-q" type="search" class="form-control form-control-sm filter-control" value="${esc(T.q)}" autocomplete="off"></div>
     </div>
     <div class="tl-count" id="tl-count" aria-live="polite"></div>
@@ -2939,6 +2943,7 @@ function ptInit() {
     if (e.target.id === 'pt-hari-unit') { PT.hariUnit = e.target.value; ptRenderHari(); }
     if (e.target.id === 'tl-f-unit') { PT.tl.unit = e.target.value; tlRenderList(); }
     if (e.target.id === 'tl-f-st') { PT.tl.st = e.target.value; tlRenderList(); }
+    if (e.target.id === 'tl-f-lbr') { PT.tl.lbr = e.target.value; tlRenderList(); }
     if (e.target.matches('[data-tl-status]')) tlSimpanStatus(e.target);
     if (e.target.id === 'tl-file') { const f = e.target.files && e.target.files[0]; e.target.value = ''; tlUnggah(f); }
   });
