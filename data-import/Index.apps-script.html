@@ -952,6 +952,8 @@ function shotGrafik(ch, salin) {
   const atur = (jalur, nilai) => { jalur.slice(0, -1).reduce((x, k) => x[k], o)[jalur[jalur.length - 1]] = nilai; };
   const dpr = o.devicePixelRatio;
   const gambar = () => { ch.update('none'); ch.resize(); ch.update('none'); };
+  // Animasi yang belum selesai menahan gambar ulang (dan perubahan resolusi); dihentikan supaya grafik langsung final.
+  ch.stop();
   ubah.forEach(([j, v]) => atur(j, Math.round(v * 1.4)));
   o.devicePixelRatio = 2;
   try {
