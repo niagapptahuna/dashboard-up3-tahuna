@@ -951,8 +951,15 @@ async function shotBlob(card) {
     src.forEach((c, i) => {
       if (!dst[i] || !c.width || !c.height) return;
       const salin = () => { dst[i].width = c.width; dst[i].height = c.height; dst[i].getContext('2d').drawImage(c, 0, 0); };
-      const grafik = besar && window.Chart && Chart.getChart(c);
-      if (grafik) shotGrafik(grafik, salin); else salin();
+      const grafik = besar && window.Chart && typeof Chart.getChart === 'function' && Chart.getChart(c);
+      if (!grafik) { salin(); return; }
+      try {
+        shotGrafik(grafik, salin);
+      } catch (err) {
+        // Gagal menggambar ulang: gambar tetap jadi, grafiknya saja berhuruf ukuran layar.
+        console.warn('Grafik unduhan tidak diperbesar:', err);
+        salin();
+      }
     });
     // Dibuang sebelum diukur, supaya tata letak gambar tidak menyisakan ruang kosong bekas tombol/filter.
     clone.querySelectorAll('.no-capture').forEach((n) => n.remove());
