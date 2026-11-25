@@ -389,6 +389,9 @@
     .pt-c-rp { width: 120px; }   /* muat Rp 1.234.567.890 */
     .pt-code { font-size: .66rem; font-weight: 600; color: #64748b; margin-right: 2px; }
     .pt-tag { display: inline-block; margin-left: 2px; font-size: .62rem; font-weight: 700; color: #475569; background: #f1f5f9; border-radius: 6px; padding: 1px 6px; }
+    .pt-mini { display: inline-flex; align-items: center; gap: 8px; }
+    .pt-mini .trk { width: 44px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .pt-mini .trk span { display: block; height: 100%; background: #125D72; }
     .pt-chart { position: relative; height: 260px; }
     .pt-empty { font-size: .8rem; font-weight: 600; color: #475569; padding: 14px 0 4px; }
     /* Tiap kartu Saldo Piutang satu warna korporat polos (PT_TEMA, --c dan --ts): pita judul, kepala tabel, baris UP3
@@ -401,6 +404,7 @@
     .pt-tema .pt-wrap:focus-visible { outline-color: var(--c); }
     .pt-tema .pt-rank li.up3 { background: var(--ts); }
     .pt-tema .pt-rank li.up3 .nm { color: var(--c); }
+    .pt-tema .pt-mini .trk span { background: var(--c); }
     .pt-band + .pt-sec { margin-top: 0; padding-top: 4px; border-top: 0; }   /* pita sudah memisahkan, tanpa garis dobel */
     /* Gambar unduhan Saldo Piutang (shotBlob): huruf kira-kira 1,3x layar, karena gambarnya biasanya dibuka mengecil di ponsel. */
     .shot-besar .dt-title { font-size: 1.4rem; }
@@ -420,6 +424,7 @@
     .shot-besar .pt-table .nps-pill { font-size: .9rem; }
     .shot-besar .pt-code { font-size: .85rem; }
     .shot-besar .pt-tag { font-size: .8rem; }
+    .shot-besar .pt-mini .trk { width: 56px; height: 10px; }
     .shot-besar .pt-k23 { min-width: 1100px; }   /* kolom satker tetap ~330px, nama paling banyak dua baris */
     .shot-besar .pt-c-n { width: 52px; }
     .shot-besar .pt-c-rp { width: 140px; }   /* muat Rp 1.234.567.890 di huruf gambar */
@@ -790,6 +795,8 @@
                 <label class="btn" for="pt-view-harian">Harian</label>
                 <input type="radio" class="btn-check" name="pt-view" id="pt-view-kogol23" value="kogol23">
                 <label class="btn" for="pt-view-kogol23">Kogol 2 &amp; 3</label>
+                <input type="radio" class="btn-check" name="pt-view" id="pt-view-nonkogol" value="nonkogol">
+                <label class="btn" for="pt-view-nonkogol">Non-Kogol 1 &amp; 2</label>
               </div>
             </div>
             <div class="pt-stamp" id="pt-stamp"></div>
@@ -801,6 +808,7 @@
       <div id="pt-content" hidden>
         <div id="pt-v-harian"></div>
         <div id="pt-v-kogol23" hidden></div>
+        <div id="pt-v-nonkogol" hidden></div>
       </div>
     </section>
     <!-- ═════════ /SALDO PIUTANG ═════════ -->
@@ -2317,6 +2325,7 @@ const PT_TEMA = {
   harian: { c: '#125D72', ts: '#E6F2F5' },     // navy PLN
   rata: { c: '#2F5496', ts: '#EAF0F8' },       // biru
   kogol: { c: '#44546A', ts: '#EDF0F4' },      // abu kebiruan
+  nonkogol: { c: '#7F6000', ts: '#F8F3E3' },   // emas tua
   tl: { c: '#843C0C', ts: '#F9EDE6' },         // cokelat bata
 };
 const ptGaya = (k) => `--c:${PT_TEMA[k].c};--ts:${PT_TEMA[k].ts}`;
@@ -2354,6 +2363,8 @@ const ptTdPct = (x, cls = '') => (x == null || !isFinite(x) ? ptTd(null, cls) : 
 const ptPill = (x) => (x == null || !isFinite(x)
   ? '<span class="nps-pill na">tanpa target</span>'
   : `<span class="nps-pill ${x >= 1 ? 'good' : 'bad'}">${ptPct(x)}</span>`);
+const ptMini = (x) => (x == null || !isFinite(x) ? '–'
+  : `<span class="pt-mini"><span class="trk" aria-hidden="true"><span style="width:${(Math.max(0, Math.min(1, x)) * 100).toFixed(1)}%"></span></span>${ptPct(x)}</span>`);
 const ptUnitTh = (u) => `<th scope="row">${u.up3 ? '' : `<span class="pt-code">${esc(u.kode)}</span> `}${esc(u.nama)}</th>`;
 const ptHead = (title, sub, shot, tools = '') => `<div class="pt-head pt-band"><div><h6 class="dt-title">${title}</h6><div class="dt-sub">${sub}</div></div>
   <div class="pt-tools">${tools}${shot ? shotBtn(shot) : ''}</div></div>`;
@@ -2405,6 +2416,7 @@ function ptModel(res) {
     const k = u.kode;
     const s = res.saldo[k];
     u.saldo = s;
+    u.lembar = res.lembar[k];
     u.sisa = PT_SISA.reduce((a, g) => ({ lbr: a.lbr + s[g][0], rp: a.rp + s[g][1] + s[g][2] }), { lbr: 0, rp: 0 });
     u.sorek = { lbr: pilih(k, (x) => ambil('sorek', x, (o) => o.lbr)), rp: pilih(k, (x) => ambil('sorek', x, (o) => o.rp)) };
     u.pel = { lbr: kurang(u.sorek.lbr, u.sisa.lbr), rp: kurang(u.sorek.rp, u.sisa.rp) };
@@ -2491,7 +2503,7 @@ function ptModel(res) {
 }
 
 function ingestPt(res) {
-  if (!res.saldo || !res.satker || !Array.isArray(res.units)) {
+  if (!res.saldo || !res.lembar || !res.satker || !Array.isArray(res.units)) {
     throw new Error('Perbarui Apps Script (deploy versi baru) untuk menampilkan Saldo Piutang.');
   }
   PT.m = res.baris ? ptModel(res) : null;
@@ -2567,10 +2579,11 @@ function renderPt() {
   const w = $('pt-warn');
   w.hidden = !m.warn.length;
   w.innerHTML = m.warn.length ? `<ul>${m.warn.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
-  ['harian', 'kogol23'].forEach((v) => { $('pt-v-' + v).hidden = v !== PT.view; });
+  ['harian', 'kogol23', 'nonkogol'].forEach((v) => { $('pt-v-' + v).hidden = v !== PT.view; });
   ptDestroyCharts();
-  if (PT.view === 'kogol23') ptRenderKogol23();
-  else ptRenderHarian();
+  if (PT.view === 'harian') ptRenderHarian();
+  else if (PT.view === 'kogol23') ptRenderKogol23();
+  else ptRenderNonKogol();
 }
 
 /* ── Tampilan Harian ── */
@@ -3046,6 +3059,31 @@ function ptRenderKogol23() {
     ${ptHead('Tunggakan Kogol 2 &amp; 3 per satker', `Menurut jumlah lembar, posisi ${esc(m.stamp)}`,
       m.satker.every(kosong) ? '' : `Saldo Piutang - Kogol 2 dan 3 per satker - posisi ${m.stamp}`)}
     ${m.satker.map(bagian).join('')}</div>`;
+}
+
+/* ── Tampilan Non-Kogol 1 & 2 (Excel: Mon. Non-Kogol 1) ── */
+function ptRenderNonKogol() {
+  const m = PT.m;
+  const up3 = m.up3;
+  const dua = ptJumlah([up3.lembar[1], up3.lembar[2]]);
+  const baris = (u) => `${ptTd(u.sorek.lbr, 's')}${ptTd(u.sorek.rp)}`
+    + u.lembar.map((x) => `${ptTd(x[0], 's')}${ptTd(x[1])}`).join('')
+    + `${ptTd(u.sisa.lbr, 's b')}${ptTd(u.sisa.rp, 'b')}${ptTdPct(u.prog.lbr, 's')}<td>${ptMini(u.prog.rp)}</td>`;
+  $('pt-v-nonkogol').innerHTML = `<div class="chart-card mb-4 pt-tema" id="pt-nonkogol-card" style="${ptGaya('nonkogol')}">
+    ${ptHead('Tagihan Non-Kogol 1 &amp; 2 per jumlah lembar', `Kogol 0, 3 dan 4 per ULP, posisi ${esc(m.stamp)}`,
+      `Saldo Piutang - Non-Kogol 1 dan 2 per lembar - posisi ${m.stamp}`)}
+    <ul class="dt-facts">
+      <li><b>${ptNum(up3.sisa.lbr)}</b>Plg menunggak</li><li><b>${ptRp(up3.sisa.rp)}</b>Rp PTL</li>
+      <li><b>${ptNum(dua[0])}</b>Plg 2 lembar atau lebih, ${esc(ptRp(dua[1]))}</li>
+      <li><b>${ptPct(up3.prog.lbr)}</b>Plg terlunasi UP3</li></ul>
+    <div class="dt-hint no-capture">Geser tabel ke samping untuk melihat semua kolom.</div>
+    <div class="pt-wrap" tabindex="0" aria-label="Tabel Non-Kogol 1 dan 2 per jumlah lembar, dapat digeser"><table class="pt-table">
+      <thead><tr><th rowspan="2" class="pt-unit" scope="col">Unit</th><th colspan="2" class="s" scope="colgroup">SOREK</th>
+        ${PT_LEMBAR.map((l) => `<th colspan="2" class="s" scope="colgroup">${esc(l)}</th>`).join('')}
+        <th colspan="2" class="s" scope="colgroup">Sisa</th><th colspan="2" class="s" scope="colgroup">Terlunasi</th></tr>
+        <tr>${ptPair('Plg', 'Rp')}${ptPair('Plg', 'Rp PTL').repeat(4)}${ptPair('Plg', 'Rp')}</tr></thead>
+      <tbody>${m.ulp.map((u) => `<tr>${ptUnitTh(u)}${baris(u)}</tr>`).join('')}</tbody>
+      <tfoot><tr>${ptUnitTh(up3)}${baris(up3)}</tr></tfoot></table></div></div>`;
 }
 
 function ptInit() {
